@@ -1,0 +1,16 @@
+# secrets
+.env
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# cache and scratch
+.cache/
+tmp/
+*.tmp
+
+# OS
+.DS_Store

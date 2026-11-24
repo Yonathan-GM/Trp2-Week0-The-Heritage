@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "title": "TODO title",
+    "logline": "TODO one sentence",
+    "audience": "TODO who watches, and where",
+    "intent": "TODO what they should feel at the end",
+    "narration_language": "am-ET",
+    "target_duration_s": 70
+  },
+  "style": {
+    "style_block": "TODO: warm, grainy, hand-painted look; palette; light",
+    "negative_prompt": "text, watermark, extra fingers, distorted face",
+    "seed": 1234
+  },
+  "characters": [
+    {
+      "id": "main",
+      "description": "TODO fixed description",
+      "consent": "fictional_or_stylised"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s01",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "extreme_wide",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s02",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "wide",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s03",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "medium",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s04",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "close",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s05",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "insert",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s06",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "medium",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s07",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "medium_close",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    },
+    {
+      "id": "s08",
+      "reason": "TODO: why this shot exists",
+      "shot_size": "wide",
+      "duration_s": 8,
+      "characters": [],
+      "image_prompt": "TODO: what the picture shows",
+      "motion_prompt": "TODO: one gentle movement, camera only",
+      "fallback": "ken_burns",
+      "narration": "TODO: narration line in your language",
+      "subtitle_en": "TODO: English subtitle"
+    }
+  ],
+  "music": {
+    "caption": "TODO style, mood, instruments, texture",
+    "instrumental": true,
+    "bpm": 70,
+    "key": "D minor",
+    "duration_s": 60,
+    "chosen_candidate": null,
+    "cues": [
+      {
+        "at_shot": "s01",
+        "note": "gentle entry"
+      },
+      {
+        "at_shot": "s08",
+        "note": "theme returns, then resolves"
+      }
+    ]
+  },
+  "end_card": {
+    "text": "Made with AI",
+    "duration_s": 3
+  }
+}

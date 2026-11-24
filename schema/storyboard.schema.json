@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Heritage Short storyboard",
+  "description": "The contract between every pipeline stage.",
+  "type": "object",
+  "required": ["meta", "style", "characters", "shots", "music", "end_card"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["title", "logline", "audience", "intent", "narration_language", "target_duration_s"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "logline": {"type": "string", "minLength": 1},
+        "audience": {"type": "string", "minLength": 1},
+        "intent": {"type": "string", "minLength": 1, "description": "What the audience should feel or understand at the end."},
+        "narration_language": {"type": "string", "description": "BCP-47 tag, e.g. am-ET"},
+        "target_duration_s": {"type": "number", "minimum": 60, "maximum": 90}
+      }
+    },
+    "style": {
+      "type": "object",
+      "required": ["style_block", "negative_prompt"],
+      "additionalProperties": false,
+      "properties": {
+        "style_block": {"type": "string", "minLength": 1, "description": "Appended to every image prompt."},
+        "negative_prompt": {"type": "string"},
+        "seed": {"type": "integer", "description": "Default seed for keyframes."}
+      }
+    },
+    "characters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "consent"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+          "description": {"type": "string", "minLength": 1, "description": "Fixed text attached to every prompt featuring this character."},
+          "reference_image": {"type": "string"},
+          "consent": {
+            "type": "string",
+            "enum": ["fictional_or_stylised", "recorded_in_ETHICS_md"],
+            "description": "Gate: any real person must have a consent record in ETHICS.md."
+          }
+        }
+      }
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["id", "reason", "shot_size", "duration_s", "image_prompt", "motion_prompt", "narration", "subtitle_en"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^s[0-9]{2}$"},
+          "reason": {"type": "string", "minLength": 1, "description": "Why this shot exists."},
+          "shot_size": {"enum": ["extreme_wide", "wide", "medium", "medium_close", "close", "extreme_close", "insert"]},
+          "duration_s": {"type": "number", "minimum": 3, "maximum": 12},
+          "characters": {"type": "array", "items": {"type": "string"}},
+          "image_prompt": {"type": "string", "minLength": 1},
+          "motion_prompt": {"type": "string", "minLength": 1, "description": "Motion and camera only."},
+          "seed": {"type": "integer"},
+          "fallback": {"enum": ["ken_burns", "none"], "default": "ken_burns"},
+          "narration": {"type": "string", "minLength": 1, "description": "Text spoken by TTS, in narration_language."},
+          "subtitle_en": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "music": {
+      "type": "object",
+      "required": ["caption", "instrumental", "duration_s", "cues"],
+      "additionalProperties": false,
+      "properties": {
+        "caption": {"type": "string", "minLength": 1},
+        "instrumental": {"type": "boolean"},
+        "bpm": {"type": "integer", "minimum": 40, "maximum": 200},
+        "key": {"type": "string"},
+        "duration_s": {"type": "number", "minimum": 30, "maximum": 90},
+        "chosen_candidate": {"type": ["integer", "null"]},
+        "cues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["at_shot", "note"],
+            "additionalProperties": false,
+            "properties": {
+              "at_shot": {"type": "string", "pattern": "^s[0-9]{2}$"},
+              "note": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "end_card": {
+      "type": "object",
+      "required": ["text", "duration_s"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "duration_s": {"type": "number", "minimum": 2, "maximum": 4}
+      }
+    }
+  }
+}
