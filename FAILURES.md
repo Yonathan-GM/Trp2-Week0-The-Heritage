@@ -70,6 +70,8 @@ Model name corrected; subsequent runs used a valid text model.
 
 - `NameError` raised on **lines 4 and 7** of `runs.jsonl`.
 
+- **Update 2026-11-25 11:40:** The fade-out alone did not remove the scratch at the end of each clip, so the artifact is inside the TTS output, not only at the join. Added automatic trimming of short bursts after a pause at the end of each clip, plus a per-clip tail loudness report to diagnose it.
+
 ### Notes
 
 Recorded here for completeness; see the run log for the exact traceback.

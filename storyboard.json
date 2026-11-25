@@ -1,137 +1,202 @@
 {
   "meta": {
-    "title": "TODO title",
-    "logline": "TODO one sentence",
-    "audience": "TODO who watches, and where",
-    "intent": "TODO what they should feel at the end",
+    "title": "The Seed That Waited Twenty Years",
+    "logline": "My parents told me how my grandmother Tiseme kept planting one warka seed through failed seedlings, hungry goats and gentle laughter, and years after she was gone it became a tree for her grandchildren.",
+    "audience": "My family and relatives, watching on their phones (vertical first) and forwarding it in family chats.",
+    "intent": "They should feel quiet pride and patience: that what we plant for others can outlive us, and that her persistence still shelters us.",
     "narration_language": "am-ET",
-    "target_duration_s": 70
+    "target_duration_s": 80
   },
   "style": {
-    "style_block": "TODO: warm, grainy, hand-painted look; palette; light",
-    "negative_prompt": "text, watermark, extra fingers, distorted face",
+    "style_block": "hand-painted watercolour illustration, warm earth tones, soft golden light, visible paper grain, gentle painterly shading, Ethiopian highland village with round thatched houses and stone walls, no text, no writing",
+    "negative_prompt": "text, letters, watermark, photorealistic face, extra fingers, distorted hands, modern objects",
     "seed": 1234
   },
   "characters": [
     {
-      "id": "main",
-      "description": "TODO fixed description",
+      "id": "grandmother",
+      "description": "an elderly Ethiopian grandmother, small and slight, grey hair under a thin scarf, wearing a white cotton shawl with a coloured border over a simple dress, stylised illustration",
+      "consent": "fictional_or_stylised"
+    },
+    {
+      "id": "children",
+      "description": "two small children and two adults, seen from behind as soft silhouettes, stylised illustration",
       "consent": "fictional_or_stylised"
     }
   ],
   "shots": [
     {
       "id": "s01",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "extreme_wide",
+      "reason": "Establish the place, the woman and the seed in one picture; the dream is introduced here.",
+      "shot_size": "wide",
       "duration_s": 8,
-      "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "characters": [
+        "grandmother"
+      ],
+      "image_prompt": "Wide shot at dawn, a small elderly woman walking a dirt path toward a round thatched house, holding a single tiny seed in her open palm, long soft shadows, mist over distant hills",
+      "motion_prompt": "Camera slowly pushes in, mist drifts across the hills, her shawl moves gently in the breeze.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "ወላጆቼ ስለ አያቴ ትሰሜ ነገሩኝ። ዘር ሁሉ ህልም ይሸከማል ብላ ታምን ነበር።",
+      "subtitle_en": "My parents told me about my grandmother Tiseme. She believed every seed carries a dream."
     },
     {
       "id": "s02",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "wide",
-      "duration_s": 8,
-      "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "reason": "The first act of hope: a close detail of hands, which keeps the face out of frame and is easy to keep consistent.",
+      "shot_size": "insert",
+      "duration_s": 7,
+      "characters": [
+        "grandmother"
+      ],
+      "image_prompt": "Close view of weathered hands pressing a seed into red-brown soil beside a stone wall, white shawl sleeve visible",
+      "motion_prompt": "Static camera, soil is brushed gently over the seed, soft dust in the light.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "አንድ ማለዳ ዘር ይዛ መጣች፤ ከቤቷ አጠገብ ተከለችው። ምንም አልበቀለም።",
+      "subtitle_en": "One morning she brought a seed home and planted it beside her house. Nothing came up."
     },
     {
       "id": "s03",
-      "reason": "TODO: why this shot exists",
+      "reason": "Her first real setback, with no single villain: she does everything right, waters it every day, and it still fails. Shows her care and that effort alone does not guarantee a result.",
       "shot_size": "medium",
-      "duration_s": 8,
-      "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "duration_s": 7,
+      "characters": [
+        "grandmother"
+      ],
+      "image_prompt": "Medium shot of the grandmother carefully pouring water from a clay jug onto a small drooping seedling in a garden beside her house, damp dark soil, soft morning light",
+      "motion_prompt": "Camera holds steady, water pours slowly, the seedling droops slightly.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "በየቀኑ ታጠጣው ነበር፤ ሆኖም በተለያዩ ምክንያቶች ቡቃያው ጠፋ።",
+      "subtitle_en": "She watered it every day, but for many different reasons, the seedling was lost."
     },
     {
       "id": "s04",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "close",
-      "duration_s": 8,
-      "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "reason": "Second failure, a different cause (goats), so the middle does not feel repetitive; she watches and does not give up.",
+      "shot_size": "medium",
+      "duration_s": 6,
+      "characters": [
+        "grandmother"
+      ],
+      "image_prompt": "Medium shot of goats crowding around a young plant in a small garden by a stone wall, the grandmother standing behind them with her hands lowered",
+      "motion_prompt": "Camera holds steady, goats move slowly, her shawl stirs in the wind.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "በቀጣዩ ዓመት ፍየሎች ቡቃያውን በሉት። እሷ ግን እንደገና ተከለች።",
+      "subtitle_en": "The year after, the goats ate it. She planted again."
     },
     {
       "id": "s05",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "insert",
-      "duration_s": 8,
-      "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "reason": "The emotional turn: persistence in the face of gentle mockery. Held for 8 seconds because this is the heart of the middle.",
+      "shot_size": "medium",
+      "duration_s": 9,
+      "characters": [
+        "grandmother"
+      ],
+      "image_prompt": "Medium shot of the grandmother kneeling to plant a seed, two villagers standing at a distance smiling kindly, round houses behind, warm afternoon light",
+      "motion_prompt": "Slow pan right across the villagers to the grandmother, gentle breeze.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "ወቅት ከወቅት፣ ያንኑ ዘር ትተክል ነበር። የመንደሩ ሰዎች በቀስታ ይስቁባት ነበር። እሷ ግን መትከሏን አላቆመችም።",
+      "subtitle_en": "Season after season, she planted the same seed. The villagers laughed, gently. She kept planting."
     },
     {
       "id": "s06",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "medium",
-      "duration_s": 8,
-      "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "reason": "Her one spoken belief, the thesis of the film, on the closest shot of her; held longest.",
+      "shot_size": "medium_close",
+      "duration_s": 10,
+      "characters": [
+        "grandmother"
+      ],
+      "image_prompt": "Medium close view of the elderly grandmother, thin and tired, kneeling and placing one last seed in the soil, golden evening light, face turned downward",
+      "motion_prompt": "Very slow push-in, soft light flicker, camera otherwise still.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "ስትደክም የመጨረሻውን ዘር ተከለች። 'ዘር አይረሳም፤ እኔ ባላየውም አንድ ቀን ያድጋል' አለች።",
+      "subtitle_en": "Old and tired, she planted one last seed. 'A seed does not forget,' she said. 'One day it will grow, even if I am not here to see it.'"
     },
     {
       "id": "s07",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "medium_close",
-      "duration_s": 8,
+      "reason": "Her absence, shown by an empty garden. The quietest shot gives the audience a pause before the turn.",
+      "shot_size": "wide",
+      "duration_s": 6,
       "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "image_prompt": "Wide shot of an empty overgrown garden beside a quiet small round house at dusk, bare soil and dry grass, nobody in sight",
+      "motion_prompt": "Static camera, grass sways slightly, the light fades slowly.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "ከዚያ አረፈች። የአትክልት ቦታዋ ዝም አለ፤ ሰውም ረሳው።",
+      "subtitle_en": "Then she passed away. Her garden grew quiet, and people forgot it."
     },
     {
       "id": "s08",
-      "reason": "TODO: why this shot exists",
-      "shot_size": "wide",
-      "duration_s": 8,
+      "reason": "The payoff begins: the first sign of life, in extreme close detail, after the quietest moment.",
+      "shot_size": "close",
+      "duration_s": 7,
       "characters": [],
-      "image_prompt": "TODO: what the picture shows",
-      "motion_prompt": "TODO: one gentle movement, camera only",
+      "image_prompt": "Close view of a tiny bright green shoot breaking through dark soil, raindrops falling, soft grey rain light",
+      "motion_prompt": "Static camera, rain falls, the shoot sways slightly.",
       "fallback": "ken_burns",
-      "narration": "TODO: narration line in your language",
-      "subtitle_en": "TODO: English subtitle"
+      "narration": "ወቅቶች ግን ይፈራረቁ ነበር። አንድ ማለዳም፣ አረንጓዴ ቡቃያ ብቅ አለ።",
+      "subtitle_en": "But the seasons kept turning. And one morning, a green shoot appeared."
+    },
+    {
+      "id": "s09",
+      "reason": "The reveal: the scale of the tree against the small shoot, and her grandchildren, including me, in its shade.",
+      "shot_size": "wide",
+      "duration_s": 10,
+      "characters": [
+        "children"
+      ],
+      "image_prompt": "Wide shot of a magnificent huge spreading warka fig tree with a wide dark-green canopy beside a small highland house, golden light, two small children playing beneath it seen from behind",
+      "motion_prompt": "Slow upward tilt along the trunk to the canopy, leaves move gently.",
+      "fallback": "ken_burns",
+      "narration": "ከሃያ ዓመት በኋላ፣ እሷ ትሠራበት በነበረው ቦታ ግዙፍ ዋርካ ቆሟል። እኛ የልጅ ልጆቿ በጥላው ሥር እንጫወታለን።",
+      "subtitle_en": "Twenty years later, a great warka tree stands where she worked. We, her grandchildren, play in its shade."
+    },
+    {
+      "id": "s10",
+      "reason": "Closes the loop: the story passes from her to my parents to me, which is why the film exists.",
+      "shot_size": "medium",
+      "duration_s": 9,
+      "characters": [
+        "children"
+      ],
+      "image_prompt": "Medium shot from behind of two adults and two small children sitting in the shade of a huge tree, looking up at its branches, warm evening light",
+      "motion_prompt": "Camera slowly pulls back, dappled light moves across them.",
+      "fallback": "ken_burns",
+      "narration": "ማን እንደተከለው ስንጠይቅ፣ ወላጆቼ ፈገግ ብለው ስለ እሷ፣ ሃያ ዓመት ስለጠበቀው ዘር ይነግሩናል።",
+      "subtitle_en": "When we ask who planted it, my parents smile and tell us about her, and about a seed that waited twenty years."
     }
   ],
   "music": {
-    "caption": "TODO style, mood, instruments, texture",
+    "caption": "slow warm instrumental, soft plucked lyre and gentle strings, light shaker, sustained warm pad, hopeful and spacious, no lead melody, cinematic",
     "instrumental": true,
-    "bpm": 70,
+    "bpm": 68,
     "key": "D minor",
-    "duration_s": 60,
+    "duration_s": 80,
     "chosen_candidate": null,
     "cues": [
       {
         "at_shot": "s01",
-        "note": "gentle entry"
+        "note": "sparse plucked entry, dawn, very quiet under the voice"
+      },
+      {
+        "at_shot": "s03",
+        "note": "thins out to almost nothing: quiet disappointment, not tragedy"
+      },
+      {
+        "at_shot": "s06",
+        "note": "strings swell gently for her last seed, still under the voice"
+      },
+      {
+        "at_shot": "s07",
+        "note": "near silence, a held pad only"
       },
       {
         "at_shot": "s08",
-        "note": "theme returns, then resolves"
+        "note": "the opening theme returns softly with the first shoot"
+      },
+      {
+        "at_shot": "s09",
+        "note": "full and warm, the emotional high point"
+      },
+      {
+        "at_shot": "s10",
+        "note": "resolves and fades out into the end card"
       }
     ]
   },
