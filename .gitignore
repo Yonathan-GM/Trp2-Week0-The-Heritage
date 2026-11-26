@@ -16,7 +16,16 @@ tmp/
 # OS
 .DS_Store
 
-# generated media: hosted elsewhere, linked from README
-outputs/*
-!outputs/MANIFEST.md
-!outputs/.gitkeep
+# outputs: keep only what we want
+outputs/assemble/
+outputs/voice_test/
+*.mp4
+
+# films are hosted elsewhere (see outputs/final/README.md)
+*.mp4
+
+# secrets
+.env
+
+# secrets
+.env
