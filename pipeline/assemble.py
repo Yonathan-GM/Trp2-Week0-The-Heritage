@@ -3,7 +3,8 @@
 Reads storyboard.json (via validate.load) and whatever exists in outputs/:
   outputs/narration/sNN.wav        narration (required)
   outputs/clips/sNN*.mp4           Wan clip for a shot (preferred)
-  outputs/keyframes/sNN*.png|jpg   keyframe image -> static fitted frame (fallback)
+  outputs/keyframes/sNN*.png|jpg   keyframe image -> Ken Burns pan/zoom (fallback);
+                                   9:16 fills the frame, 16:9 shows the whole picture on a blurred copy
   outputs/music/*                  chosen ACE-Step track (else a placeholder drone)
 A shot with neither clip nor keyframe becomes a dark placeholder card, so the whole
 pipeline can be tested before any pictures exist.
@@ -35,15 +36,15 @@ from radio_cut import RATE, prepare, read_pcm
 FPS = 24
 FADE_S = 0.3            # short dip at each shot edge; set 0 for hard cuts
 MUSIC_GAIN = 0.5        # music level before ducking
-MAX_CROP = 0.25         # if source and frame shape differ more than this, use blurred fill instead of cropping
-IMAGE_ZOOM = 1.02       # subtle push-in across still-image shots
-IMAGE_ZOOM_SCALE = 2    # supersampling smooths subpixel movement before output scaling
+MAX_CROP = 0.50         # if source and frame shape differ more than this, use blurred fill instead of cropping
 TARGET_LUFS = -14
 TARGET_TP = -1
 SUB_MAX_CHARS = 40
 SUB_MAX_LINES = 2
 FORMATS = {"vertical": (1080, 1920), "horizontal": (1920, 1080)}
-SUB_BOTTOM = {"vertical": 0.80, "horizontal": 0.90}   # bottom of subtitle block, fraction of height (safe area)
+SUB_BOTTOM = {"vertical": 0.80, "horizontal": 0.90}
+FIT = {"vertical": "cover", "horizontal": "contain"}   # cover: picture fills the frame; contain: whole picture on a blurred copy
+ZOOM = 0.08            # total slow zoom during a Ken Burns shot (8 %)   # bottom of subtitle block, fraction of height (safe area)
 
 # where earlier pipeline steps are assumed to write; change here if yours differ
 CLIP_DIRS = [OUT / "clips", OUT / "shots", OUT / "video"]
@@ -301,14 +302,66 @@ def fit_graph(inp, W, H, sw, sh, out):
             f"[fbg][ffg]overlay=(W-w)/2:(H-h)/2,setsar=1[{out}]")
 
 
-def make_segment(tl, W, H, work, sub_bottom):
+def smoothstep(p):
+    return p * p * (3 - 2 * p)
+
+
+def kb_frames(path, W, H, n, idx, fit):
+    """Yield n raw RGB frames of a slow pan/zoom over one picture, smooth to the sub-pixel.
+
+    fit="cover":   the picture fills the frame (the sides are cropped, so keep subjects centred).
+    fit="contain": the whole picture is shown, centred, on a blurred copy of itself.
+    The crop box uses float coordinates, so there is no pixel stepping (the shake that
+    ffmpeg's zoompan filter produced).
+    """
+    from PIL import Image, ImageEnhance
+    src = Image.open(path).convert("RGB")
+    sw, sh = src.size
+    bg = None
+    if fit == "cover":
+        out_w, out_h = W, H
+        if sw / sh > W / H:
+            bh0, bw0 = float(sh), sh * W / H
+        else:
+            bw0, bh0 = float(sw), sw * H / W
+    else:
+        k = min(W / sw, H / sh)
+        out_w, out_h = round(sw * k), round(sh * k)
+        bw0, bh0 = float(sw), float(sh)
+        s = max(W / sw, H / sh)
+        big = src.resize((max(W, round(sw * s)), max(H, round(sh * s))), Image.BICUBIC)
+        left, top = (big.width - W) // 2, (big.height - H) // 2
+        bg = big.crop((left, top, left + W, top + H))
+        bg = bg.resize((max(2, W // 8), max(2, H // 8)), Image.BILINEAR)
+        from PIL import ImageFilter
+        bg = bg.filter(ImageFilter.GaussianBlur(4)).resize((W, H), Image.BICUBIC)
+        bg = ImageEnhance.Brightness(bg).enhance(0.8)
+    zoom_in = idx % 2 == 0
+    fx0, fx1 = {2: (0.62, 0.38), 3: (0.38, 0.62)}.get(idx % 4, (0.5, 0.5))
+    for i in range(n):
+        p = smoothstep(i / max(1, n - 1))
+        z = 1 + ZOOM * (p if zoom_in else 1 - p)
+        bw, bh = bw0 / z, bh0 / z
+        fx = fx0 + (fx1 - fx0) * p
+        x0, y0 = fx * (sw - bw), 0.5 * (sh - bh)
+        piece = src.resize((out_w, out_h), Image.BICUBIC, box=(x0, y0, x0 + bw, y0 + bh))
+        if bg is None:
+            frame = piece
+        else:
+            frame = bg.copy()
+            frame.paste(piece, ((W - out_w) // 2, (H - out_h) // 2))
+        yield frame.tobytes()
+
+
+def make_segment(idx, tl, W, H, work, sub_bottom, fit):
     shot, slot = tl["shot"], tl["slot"]
+    n = max(1, round(slot * FPS))
     kind, src = find_source(shot["id"])
     cues = make_cues(shot["subtitle_en"], tl["voice_s"])
     stat = src.stat() if src else None
     key = hashlib.sha1(json.dumps([str(src), stat.st_mtime_ns if stat else 0, stat.st_size if stat else 0,
-                                   cues, W, H, round(slot, 3), IMAGE_ZOOM, IMAGE_ZOOM_SCALE,
-                                   MAX_CROP, FADE_S, FPS]).encode()).hexdigest()[:8]
+                                   cues, W, H, round(slot, 3), idx % 4, FADE_S, FPS, fit, ZOOM, "kb2"]
+                                  ).encode()).hexdigest()[:8]
     out = work / "segments" / f"{shot['id']}_{W}x{H}_{key}.mp4"
     if out.exists():
         return out, kind
@@ -319,24 +372,17 @@ def make_segment(tl, W, H, work, sub_bottom):
         render_text_png(lines, W, H, p, H * sub_bottom, 0.047, boxed=True)
         pngs.append((t0, t1, p))
 
+    frames = None
     if kind == "clip":
         sw, sh = probe_video(src)
         inputs = ["-i", src]
-        graph = (f"[0:v]setpts={stretch_of(src, slot):.4f}*PTS,fps={FPS}[src];" + fit_graph("src", W, H, sw, sh, "fit") +
+        graph = (f"[0:v]setpts={stretch_of(src, slot):.4f}*PTS,fps={FPS}[src];"
+                 + fit_graph("src", W, H, sw, sh, "fit") +
                  f";[fit]tpad=stop_mode=clone:stop_duration={slot:.2f}[base]")
     elif kind == "image":
-        from PIL import Image
-        with Image.open(src) as image:
-            sw, sh = image.size
-        inputs = ["-loop", "1", "-framerate", str(FPS), "-i", src]
-        frames = max(1, round(slot * FPS) - 1)
-        zoom_w, zoom_h = W * IMAGE_ZOOM_SCALE, H * IMAGE_ZOOM_SCALE
-        progress = f"min(on/{frames},1)"
-        eased_zoom = f"1+{IMAGE_ZOOM - 1:.4f}*{progress}*{progress}*(3-2*{progress})"
-        graph = (fit_graph("0:v", zoom_w, zoom_h, sw, sh, "fit") +
-                 f";[fit]zoompan=z='{eased_zoom}':"
-                 f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={zoom_w}x{zoom_h}:fps={FPS}[zoom];"
-                 f"[zoom]scale={W}:{H}:flags=lanczos,setsar=1[base]")
+        inputs = ["-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", FPS, "-i", "-"]
+        graph = "[0:v]null[base]"
+        frames = kb_frames(src, W, H, n, idx, fit)
     else:
         inputs = ["-f", "lavfi", "-i", f"color=c=0x2b2118:s={W}x{H}:r={FPS}:d={slot:.2f}"]
         graph = "[0:v]null[base]"
@@ -351,8 +397,25 @@ def make_segment(tl, W, H, work, sub_bottom):
                   f"format=yuv420p[out]")
     else:
         graph += f";[{prev}]format=yuv420p[out]"
-    ff([*inputs, "-filter_complex", graph, "-map", "[out]", "-t", f"{slot:.3f}", "-r", FPS, "-an",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", 18, out], f"segment {shot['id']}")
+
+    tmp = out.with_name(out.stem + "_tmp.mp4")     # write to a temp name so a failed run is never cached
+    args = [*inputs, "-filter_complex", graph, "-map", "[out]", "-t", f"{slot:.3f}", "-r", FPS, "-an",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", 18, tmp]
+    if frames is None:
+        ff(args, f"segment {shot['id']}")
+    else:
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *map(str, args)]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            for fr in frames:
+                proc.stdin.write(fr)
+        except BrokenPipeError:
+            pass
+        proc.stdin.close()
+        err = proc.stderr.read().decode(errors="replace")
+        if proc.wait():
+            raise SystemExit(f"ffmpeg failed (segment {shot['id']}):\n{err[-1800:]}")
+    tmp.replace(out)
     return out, kind
 
 
@@ -390,7 +453,7 @@ def main():
     try:
         import PIL  # noqa: F401
     except ImportError:
-        raise SystemExit("Pillow is missing. Run: python -m pip install pillow")
+        raise SystemExit("Pillow is missing. Run: pip install pillow")
 
     sb = load()
     end_s = float(sb["end_card"]["duration_s"])
@@ -419,8 +482,8 @@ def main():
         W, H = int(W0 * scale), int(H0 * scale)
         print(f"\nBuilding {name} {W}x{H}")
         segs = []
-        for tl in timeline:
-            seg, kind = make_segment(tl, W, H, work, SUB_BOTTOM[name])
+        for i, tl in enumerate(timeline):
+            seg, kind = make_segment(i, tl, W, H, work, SUB_BOTTOM[name], FIT[name])
             kinds[tl["shot"]["id"]] = kind
             print(f"  {tl['shot']['id']}  {kind:11s} slot {tl['slot']:.1f} s")
             segs.append(seg)
@@ -434,9 +497,9 @@ def main():
         last = out
 
     missing = [s for s, k in kinds.items() if k == "placeholder"]
-    still = [s for s, k in kinds.items() if k == "image"]
+    kb = [s for s, k in kinds.items() if k == "image"]
     print(f"\nWan clips: {sum(1 for k in kinds.values() if k == 'clip')}, "
-          f"keyframes with subtle zoom: {len(still)} {still}, placeholder cards: {len(missing)} {missing}")
+          f"Ken Burns from keyframe: {len(kb)} {kb}, placeholder cards: {len(missing)} {missing}")
     log_run("assemble", "ffmpeg", {"total_s": round(total, 1), "draft": args.draft,
                                    "placeholders": len(missing)}, output=last)
 

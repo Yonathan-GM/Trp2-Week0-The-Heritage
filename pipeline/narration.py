@@ -35,7 +35,7 @@ except ImportError:                      # older SDK without these names
         pass
 
 PROVIDER = "addis-ai"
-VOICE = "am-yohanes-calm"        # change after comparing voices with addis_voice_test.py
+VOICE = "am-yohanes-calm" # voice id from the Addis catalogue (addis_voice_test.py lists them)
 LANGUAGE = "am"
 VOICE_SETTINGS = None     # e.g. {"speed": 50, "stability": 50, "similarity": 50, "style": 0}
 RATE = 24000

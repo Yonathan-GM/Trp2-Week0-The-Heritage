@@ -44,8 +44,8 @@ date is recorded.
 
 | Stage | Provider | Unit | List price | Date checked |
 |---|---|---|---|---|
-| Narration (TTS) | Google (Gemini) | per 1M characters | [TBD] | [YYYY-MM-DD] |
-| Keyframes | Cloudflare (FLUX.1 schnell) | per image | [TBD] | [YYYY-MM-DD] |
+| Narration (TTS) | Addis AI | per generated minute | <price from your Addis dashboard> | 2026-11-26 |
+| Keyframes | Cloudflare (FLUX.1 schnell) | per 1024x1024 image at 4 steps | $0.00063 ($0.0000528 per 512x512 tile + $0.0001056 per step) | 2026-11-26 |
 | Text | Google (Gemini 3.5 Flash) | per 1M input/output tokens | [TBD] | [YYYY-MM-DD] |
 
 **Pricing sources to check:**

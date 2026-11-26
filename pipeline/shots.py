@@ -6,7 +6,7 @@ Wan 2.2 TI2V-5B runs on Kaggle/Colab, not here. This stage:
   2. ingests clips you copied back from the notebook into outputs/shots/<id>.mp4, logs them
      (with the notebook's seconds-per-clip from outputs/shots/timings.json if present);
   3. moves a clip made from an OLD keyframe to outputs/shots/stale/ so assemble.py never uses it;
-  4. leaves every other shot to the subtle-zoom keyframe fallback in assemble.py.
+  4. leaves every other shot to the Ken Burns fallback in assemble.py.
 
 Workflow: python pipeline/shots.py -> upload wan_input.zip to Kaggle -> run the notebook ->
 download wan_clips.zip, unzip into outputs/shots/ -> python pipeline/shots.py again to log them.
@@ -92,7 +92,7 @@ def main():
         zip_path.unlink()
     print(f"\n{len(jobs)} job(s) written ({time.strftime('%H:%M:%S')})."
           + (f" Upload {zip_path} to Kaggle." if jobs else "")
-          + " Shots without a clip use the subtle-zoom keyframe fallback.")
+          + " Shots without a clip use the Ken Burns fallback.")
 
 
 if __name__ == "__main__":

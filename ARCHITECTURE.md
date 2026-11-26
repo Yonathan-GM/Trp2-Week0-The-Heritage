@@ -31,4 +31,16 @@ the call is skipped and logged as a cache hit. Change one prompt and only that s
 
 One JSON line per model call in `runs.jsonl`: stage, model, params, seed, latency, cost, GPU minutes, cache hit/miss.
 
-TODO: add a diagram once the assemble stage is built.
+```mermaid
+flowchart LR
+  SB[storyboard.json] --> V[validate]
+  V --> N[narration: Addis AI]
+  V --> K[keyframes: FLUX.1 schnell]
+  K --> S[shots: Wan 2.2, optional]
+  SB --> M[music: ACE-Step or code synth]
+  N --> A[assemble: FFmpeg + Pillow]
+  K --> A
+  S --> A
+  M --> A
+  A --> F[film_vertical.mp4 + film_horizontal.mp4]
+  ```

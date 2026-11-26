@@ -20,3 +20,4 @@ outputs/*
 !outputs/final/
 outputs/final/*
 !outputs/final/*.mp4
+*.bak*
