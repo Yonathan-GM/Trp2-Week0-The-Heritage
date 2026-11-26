@@ -11,13 +11,12 @@ __pycache__/
 .cache/
 tmp/
 *.tmp
+*.bak*
 
 # OS
 .DS_Store
 
-# generated outputs (keep final videos)
+# generated media: hosted elsewhere, linked from README
 outputs/*
-!outputs/final/
-outputs/final/*
-!outputs/final/*.mp4
-*.bak*
+!outputs/MANIFEST.md
+!outputs/.gitkeep
