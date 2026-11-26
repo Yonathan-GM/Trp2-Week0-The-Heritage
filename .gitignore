@@ -14,3 +14,9 @@ tmp/
 
 # OS
 .DS_Store
+
+# generated outputs (keep final videos)
+outputs/*
+!outputs/final/
+outputs/final/*
+!outputs/final/*.mp4

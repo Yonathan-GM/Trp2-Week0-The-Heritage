@@ -33,7 +33,7 @@ Every model call (hit or miss) is logged as one line in `runs.jsonl`.
 
 Wan and ACE-Step run on borrowed GPUs, so those two stages write a job file, you run the
 notebook, copy the results back, and re-run the stage to log them. Shots without a clip
-fall back to a Ken Burns pan-and-zoom over the keyframe.
+fall back to a subtle keyframe zoom, fitted with blurred fill when needed.
 
 ## What it costs
 

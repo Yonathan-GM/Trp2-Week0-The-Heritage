@@ -3,7 +3,7 @@
 Reads storyboard.json (via validate.load) and whatever exists in outputs/:
   outputs/narration/sNN.wav        narration (required)
   outputs/clips/sNN*.mp4           Wan clip for a shot (preferred)
-  outputs/keyframes/sNN*.png|jpg   keyframe image -> Ken Burns pan/zoom (fallback)
+  outputs/keyframes/sNN*.png|jpg   keyframe image -> static fitted frame (fallback)
   outputs/music/*                  chosen ACE-Step track (else a placeholder drone)
 A shot with neither clip nor keyframe becomes a dark placeholder card, so the whole
 pipeline can be tested before any pictures exist.
@@ -35,7 +35,9 @@ from radio_cut import RATE, prepare, read_pcm
 FPS = 24
 FADE_S = 0.3            # short dip at each shot edge; set 0 for hard cuts
 MUSIC_GAIN = 0.5        # music level before ducking
-MAX_CROP = 0.50         # if source and frame shape differ more than this, use blurred fill instead of cropping
+MAX_CROP = 0.25         # if source and frame shape differ more than this, use blurred fill instead of cropping
+IMAGE_ZOOM = 1.02       # subtle push-in across still-image shots
+IMAGE_ZOOM_SCALE = 2    # supersampling smooths subpixel movement before output scaling
 TARGET_LUFS = -14
 TARGET_TP = -1
 SUB_MAX_CHARS = 40
@@ -299,20 +301,14 @@ def fit_graph(inp, W, H, sw, sh, out):
             f"[fbg][ffg]overlay=(W-w)/2:(H-h)/2,setsar=1[{out}]")
 
 
-def ken_burns(idx, n):
-    z = f"1+0.10*on/{n}" if idx % 2 == 0 else f"1.10-0.10*on/{n}"
-    xs = ["iw/2-(iw/zoom/2)", "iw/2-(iw/zoom/2)", "(iw-iw/zoom)*0.25", "(iw-iw/zoom)*0.75"]
-    return z, xs[idx % 4], "ih/2-(ih/zoom/2)"
-
-
-def make_segment(idx, tl, W, H, work, sub_bottom):
+def make_segment(tl, W, H, work, sub_bottom):
     shot, slot = tl["shot"], tl["slot"]
-    n = max(1, round(slot * FPS))
     kind, src = find_source(shot["id"])
     cues = make_cues(shot["subtitle_en"], tl["voice_s"])
     stat = src.stat() if src else None
     key = hashlib.sha1(json.dumps([str(src), stat.st_mtime_ns if stat else 0, stat.st_size if stat else 0,
-                                   cues, W, H, round(slot, 3), idx % 4, FADE_S, FPS]).encode()).hexdigest()[:8]
+                                   cues, W, H, round(slot, 3), IMAGE_ZOOM, IMAGE_ZOOM_SCALE,
+                                   MAX_CROP, FADE_S, FPS]).encode()).hexdigest()[:8]
     out = work / "segments" / f"{shot['id']}_{W}x{H}_{key}.mp4"
     if out.exists():
         return out, kind
@@ -329,11 +325,18 @@ def make_segment(idx, tl, W, H, work, sub_bottom):
         graph = (f"[0:v]setpts={stretch_of(src, slot):.4f}*PTS,fps={FPS}[src];" + fit_graph("src", W, H, sw, sh, "fit") +
                  f";[fit]tpad=stop_mode=clone:stop_duration={slot:.2f}[base]")
     elif kind == "image":
-        sw, sh = probe_video(src)
-        z, x, y = ken_burns(idx, n)
-        inputs = ["-i", src]
-        graph = (fit_graph("0:v", W * 2, H * 2, sw, sh, "fit") +
-                 f";[fit]zoompan=z='{z}':x='{x}':y='{y}':d={n}:s={W}x{H}:fps={FPS}[base]")
+        from PIL import Image
+        with Image.open(src) as image:
+            sw, sh = image.size
+        inputs = ["-loop", "1", "-framerate", str(FPS), "-i", src]
+        frames = max(1, round(slot * FPS) - 1)
+        zoom_w, zoom_h = W * IMAGE_ZOOM_SCALE, H * IMAGE_ZOOM_SCALE
+        progress = f"min(on/{frames},1)"
+        eased_zoom = f"1+{IMAGE_ZOOM - 1:.4f}*{progress}*{progress}*(3-2*{progress})"
+        graph = (fit_graph("0:v", zoom_w, zoom_h, sw, sh, "fit") +
+                 f";[fit]zoompan=z='{eased_zoom}':"
+                 f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={zoom_w}x{zoom_h}:fps={FPS}[zoom];"
+                 f"[zoom]scale={W}:{H}:flags=lanczos,setsar=1[base]")
     else:
         inputs = ["-f", "lavfi", "-i", f"color=c=0x2b2118:s={W}x{H}:r={FPS}:d={slot:.2f}"]
         graph = "[0:v]null[base]"
@@ -416,8 +419,8 @@ def main():
         W, H = int(W0 * scale), int(H0 * scale)
         print(f"\nBuilding {name} {W}x{H}")
         segs = []
-        for i, tl in enumerate(timeline):
-            seg, kind = make_segment(i, tl, W, H, work, SUB_BOTTOM[name])
+        for tl in timeline:
+            seg, kind = make_segment(tl, W, H, work, SUB_BOTTOM[name])
             kinds[tl["shot"]["id"]] = kind
             print(f"  {tl['shot']['id']}  {kind:11s} slot {tl['slot']:.1f} s")
             segs.append(seg)
@@ -431,9 +434,9 @@ def main():
         last = out
 
     missing = [s for s, k in kinds.items() if k == "placeholder"]
-    kb = [s for s, k in kinds.items() if k == "image"]
+    still = [s for s, k in kinds.items() if k == "image"]
     print(f"\nWan clips: {sum(1 for k in kinds.values() if k == 'clip')}, "
-          f"Ken Burns from keyframe: {len(kb)} {kb}, placeholder cards: {len(missing)} {missing}")
+          f"keyframes with subtle zoom: {len(still)} {still}, placeholder cards: {len(missing)} {missing}")
     log_run("assemble", "ffmpeg", {"total_s": round(total, 1), "draft": args.draft,
                                    "placeholders": len(missing)}, output=last)
 

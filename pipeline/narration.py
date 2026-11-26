@@ -1,78 +1,113 @@
-"""Stage: narration. One WAV per shot via Gemini TTS, cached by content hash."""
-import base64
+﻿"""Stage: narration. One WAV per shot, spoken by Addis AI (Amharic), cached by hash.
+
+Output: outputs/narration/<shot>.wav as 24 kHz mono 16-bit, which is what radio_cut.py and
+assemble.py expect (Addis returns 44.1 kHz, so each clip is converted with ffmpeg).
+
+Needs:  python -m pip install -U addisai    ADDIS_API_KEY in .env    ffmpeg on PATH
+
+Usage:
+  python pipeline/narration.py            every shot; lines whose text and voice are unchanged
+                                          come from the cache and are not charged again
+  python pipeline/narration.py s11 s05    only these shots
+"""
+import json
+import subprocess
+import sys
+import tempfile
 import time
-import wave
+from pathlib import Path
 
-import requests
-
-from common import OUT, cached_output, content_hash, env, log_run
+from common import OUT, cached_output, content_hash, env
 from validate import load
 
-# ---- change these two lines to change how the narrator sounds ----------------
-MODEL = "gemini-3.8-flash-tts"
-VOICE = "Charon"   # other prebuilt voices include: Charon, Puck, Fenrir, Orus, Zephyr, Aoede, Leda, Sulafat, Gacrux
-# ------------------------------------------------------------------------------
-# Style direction in the documented "Say <how>: <text>" form. The first version put the
-# instruction on its own line and the model sometimes read it aloud in English. If it
-# still does, set STYLE = "" so only the narration text is sent.
-STYLE = ""
-GAP_S = 20             # pause between generated shots (free-tier limits are tight)
-MAX_429_RETRIES = 5    # waits 20+40+60+80+100 s, then stops cleanly
+try:
+    from addisai import AddisAI
+except ImportError:
+    raise SystemExit("The addisai package is missing. Run: python -m pip install -U addisai")
+
+try:
+    from addisai import InsufficientCreditsError, RateLimitError
+except ImportError:                      # older SDK without these names
+    class InsufficientCreditsError(Exception):
+        pass
+
+    class RateLimitError(Exception):
+        pass
+
+PROVIDER = "addis-ai"
+VOICE = "am-yohanes-calm"        # change after comparing voices with addis_voice_test.py
+LANGUAGE = "am"
+VOICE_SETTINGS = None     # e.g. {"speed": 50, "stability": 50, "similarity": 50, "style": 0}
+RATE = 24000
+MAX_TRIES = 3
+
+_client = None
 
 
-def wav_seconds(path):
-    with wave.open(str(path), "rb") as w:
-        return w.getnframes() / w.getframerate()
+def client():
+    global _client
+    if _client is None:
+        _client = AddisAI(api_key=env("ADDIS_API_KEY"))
+    return _client
 
 
-def synth(text, lang, out_path, shot_id=""):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
-    prompt = f"{STYLE}: {text}" if STYLE else text
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "responseModalities": ["AUDIO"],
-            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOICE}}},
-        },
-    }
-    for attempt in range(1, MAX_429_RETRIES + 1):
-        r = requests.post(url, headers={"x-goog-api-key": env("GEMINI_API_KEY")}, timeout=180, json=body)
-        if r.status_code != 429:
+def synth(text, out_path):
+    args = {"voice_id": VOICE, "text": text, "language": LANGUAGE, "output_format": "wav_44100"}
+    if VOICE_SETTINGS:
+        args["voice_settings"] = VOICE_SETTINGS
+    clip = None
+    for attempt in range(1, MAX_TRIES + 1):
+        try:
+            clip = client().voice.generate(**args)
             break
-        wait = 20 * attempt
-        log_run("narration", MODEL, {"shot": shot_id, "attempt": attempt, "wait_s": wait},
-                ok=False, error="429: " + r.text[:300].replace("\n", " "))
-        print(f"  {shot_id}: 429 quota/rate limit, waiting {wait}s [{attempt}/{MAX_429_RETRIES}]")
-        time.sleep(wait)
-    else:
-        # Stop cleanly instead of burning minutes on retries. Finished shots stay cached.
-        print("\nStill rate limited after all waits. Full server message:\n" + r.text[:900])
-        print("\nFinished shots are cached. Re-run later, or try another TTS model in MODEL.")
-        raise SystemExit(2)  # SystemExit is not retried by common.retry
-    r.raise_for_status()
-    pcm = base64.b64decode(r.json()["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])
-    with wave.open(str(out_path), "wb") as w:  # 24 kHz mono 16-bit PCM
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(24000)
-        w.writeframes(pcm)
+        except InsufficientCreditsError as e:
+            raise SystemExit(f"Addis AI credits are used up: {e}")
+        except RateLimitError as e:
+            wait = getattr(e, "retry_after", None) or 2 * attempt
+            print(f"  rate limited, waiting {wait} s (try {attempt}/{MAX_TRIES})")
+            time.sleep(wait)
+    if clip is None:
+        raise SystemExit("Addis AI kept rate-limiting; try again in a minute.")
+
+    with tempfile.TemporaryDirectory() as d:
+        raw = Path(d) / "raw.wav"
+        clip.to_file(str(raw))
+        r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
+                            "-ar", str(RATE), "-ac", "1", "-sample_fmt", "s16", "-f", "wav", str(out_path)],
+                           capture_output=True, text=True)
+        if r.returncode:
+            raise SystemExit("ffmpeg could not convert the Addis audio:\n" + r.stderr[-800:])
+    try:    # keep the credits used, for COSTS.md
+        with open(OUT / "narration" / "addis_usage.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "voice": VOICE,
+                                "chars": len(text), "usage": getattr(clip, "usage", None)},
+                               ensure_ascii=False, default=str) + "\n")
+    except OSError:
+        pass
 
 
 def main():
     sb = load()
-    lang = sb["meta"]["narration_language"]
+    wanted = set(sys.argv[1:])
+    known = {s["id"] for s in sb["shots"]}
+    if wanted - known:
+        raise SystemExit(f"Unknown shot id(s): {sorted(wanted - known)}. Known: {sorted(known)}")
+    (OUT / "narration").mkdir(parents=True, exist_ok=True)
+    made = 0
     for shot in sb["shots"]:
-        key = content_hash(MODEL, VOICE, STYLE, lang, shot["narration"])
+        if wanted and shot["id"] not in wanted:
+            continue
+        text = shot["narration"].strip()
+        if not text:
+            print(f"{shot['id']}: no narration text, skipped")
+            continue
+        key = content_hash(PROVIDER, VOICE, LANGUAGE, json.dumps(VOICE_SETTINGS, sort_keys=True), text)
         out = OUT / "narration" / f"{shot['id']}.wav"
-        _, hit = cached_output(
-            "narration", key, out,
-            lambda p, s=shot: synth(s["narration"], lang, p, s["id"]),
-            MODEL, {"voice": VOICE, "lang": lang, "shot": shot["id"]})
-        dur = wav_seconds(out)
-        flag = "  <-- LONGER than the shot" if dur > shot["duration_s"] else ""
-        print(f"{shot['id']}: {'cached' if hit else 'generated'}  {dur:.1f}s of {shot['duration_s']}s{flag}")
-        if not hit:
-            time.sleep(GAP_S)
+        _, hit = cached_output("narration", key, out, lambda p, t=text: synth(t, p),
+                               f"{PROVIDER}:{VOICE}", {"shot": shot["id"], "chars": len(text)}, seed=None)
+        print(f"{shot['id']}: {'cached' if hit else 'generated'}")
+        made += 0 if hit else 1
+    print(f"\n{made} clip(s) generated this run.")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ the call is skipped and logged as a cache hit. Change one prompt and only that s
 - Failures are logged to `runs.jsonl` with `ok: false` and the error.
 - Wan/ACE-Step run on borrowed GPUs: stages write job files and ingest results, so a
   timed-out notebook loses at most one job.
-- Any shot without a clip falls back to Ken Burns over its keyframe (`fallback` in the storyboard).
+- Any shot without a clip uses a subtly zooming, fitted keyframe (`fallback` in the storyboard).
 - Secrets live in `.env` (git-ignored); `.env.example` documents the names.
 
 ## Logging

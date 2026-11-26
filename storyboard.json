@@ -5,7 +5,7 @@
     "audience": "My family and relatives, watching on their phones (vertical first) and forwarding it in family chats.",
     "intent": "They should feel quiet pride and patience: that what we plant for others can outlive us, and that her persistence still shelters us.",
     "narration_language": "am-ET",
-    "target_duration_s": 80
+    "target_duration_s": 87
   },
   "style": {
     "style_block": "hand-painted watercolour illustration, warm earth tones, soft golden light, visible paper grain, gentle painterly shading, Ethiopian highland village with round thatched houses and stone walls, no text, no writing",
@@ -15,13 +15,28 @@
   "characters": [
     {
       "id": "grandmother",
-      "description": "an elderly Ethiopian grandmother, small and slight, grey hair under a thin scarf, wearing a white cotton shawl with a coloured border over a simple dress, stylised illustration",
+      "description": "an elderly Ethiopian grandmother, small and slight, silver-grey hair under a thin scarf, wearing a white cotton shawl with a dark brown woven border and fringe over a simple pale dress, stylised illustration",
       "consent": "fictional_or_stylised"
     },
     {
       "id": "children",
       "description": "two small children and two adults, seen from behind as soft silhouettes, stylised illustration",
       "consent": "fictional_or_stylised"
+    },
+    {
+      "id": "kids",
+      "consent": "fictional_or_stylised",
+      "description": "three small Ethiopian children with warm deep brown skin and short black hair, playing, seen from behind or from the side as small stylised figures in simple bright cotton clothes, stylised illustration"
+    },
+    {
+      "id": "mother",
+      "consent": "fictional_or_stylised",
+      "description": "a gentle Ethiopian woman in her forties with warm deep brown skin, dark hair under a light scarf, wearing a white cotton shawl with a dark brown woven border over a simple dress, seen from the side, stylised illustration"
+    },
+    {
+      "id": "child",
+      "consent": "fictional_or_stylised",
+      "description": "a small Ethiopian child of about eight with warm deep brown skin and short black curly hair, in a simple cotton tunic, seen from behind or the side, stylised illustration"
     }
   ],
   "shots": [
@@ -47,7 +62,7 @@
       "characters": [
         "grandmother"
       ],
-      "image_prompt": "Close view of weathered hands pressing a seed into red-brown soil beside a stone wall, white shawl sleeve visible",
+      "image_prompt": "Close view of weathered hands pressing a seed into bare red-brown soil beside a stone wall, no plant or sprout visible, white shawl sleeve visible",
       "motion_prompt": "Static camera, soil is brushed gently over the seed, soft dust in the light.",
       "fallback": "ken_burns",
       "narration": "አንድ ማለዳ ዘር ይዛ መጣች፤ ከቤቷ አጠገብ ተከለችው። ምንም አልበቀለም።",
@@ -71,7 +86,7 @@
       "id": "s04",
       "reason": "Second failure, a different cause (goats), so the middle does not feel repetitive; she watches and does not give up.",
       "shot_size": "medium",
-      "duration_s": 6,
+      "duration_s": 7,
       "characters": [
         "grandmother"
       ],
@@ -83,13 +98,13 @@
     },
     {
       "id": "s05",
-      "reason": "The emotional turn: persistence in the face of gentle mockery. Held for 8 seconds because this is the heart of the middle.",
+      "reason": "The emotional turn: persistence in the face of gentle mockery. Held for 9 seconds because this is the heart of the middle.",
       "shot_size": "medium",
       "duration_s": 9,
       "characters": [
         "grandmother"
       ],
-      "image_prompt": "Medium shot of the grandmother kneeling to plant a seed, two villagers standing at a distance smiling kindly, round houses behind, warm afternoon light",
+      "image_prompt": "Medium shot of the grandmother kneeling to press a seed into bare soil, no sprout visible, two villagers standing at a distance smiling kindly, round houses behind, warm afternoon light",
       "motion_prompt": "Slow pan right across the villagers to the grandmother, gentle breeze.",
       "fallback": "ken_burns",
       "narration": "ወቅት ከወቅት፣ ያንኑ ዘር ትተክል ነበር። የመንደሩ ሰዎች በቀስታ ይስቁባት ነበር። እሷ ግን መትከሏን አላቆመችም።",
@@ -103,7 +118,7 @@
       "characters": [
         "grandmother"
       ],
-      "image_prompt": "Medium close view of the elderly grandmother, thin and tired, kneeling and placing one last seed in the soil, golden evening light, face turned downward",
+      "image_prompt": "Medium close view of the elderly grandmother, thin and tired, kneeling and pressing one tiny seed into bare brown soil with her fingertips, no plant and no sprout anywhere, only bare earth, golden evening light, face turned downward, full-bleed painting filling the entire frame, no border, no signature",
       "motion_prompt": "Very slow push-in, soft light flicker, camera otherwise still.",
       "fallback": "ken_burns",
       "narration": "ስትደክም የመጨረሻውን ዘር ተከለች። 'ዘር አይረሳም፤ እኔ ባላየውም አንድ ቀን ያድጋል' አለች።",
@@ -135,31 +150,46 @@
     },
     {
       "id": "s09",
-      "reason": "The reveal: the scale of the tree against the small shoot, and her grandchildren, including me, in its shade.",
+      "reason": "The reveal: the scale of the great tree where only a small shoot was, with her grandchildren in its shade.",
       "shot_size": "wide",
-      "duration_s": 10,
+      "duration_s": 8,
       "characters": [
         "children"
       ],
       "image_prompt": "Wide shot of a magnificent huge spreading warka fig tree with a wide dark-green canopy beside a small highland house, golden light, two small children playing beneath it seen from behind",
       "motion_prompt": "Slow upward tilt along the trunk to the canopy, leaves move gently.",
       "fallback": "ken_burns",
-      "narration": "ከሃያ ዓመት በኋላ፣ እሷ ትሠራበት በነበረው ቦታ ግዙፍ ዋርካ ቆሟል። እኛ የልጅ ልጆቿ በጥላው ሥር እንጫወታለን።",
-      "subtitle_en": "Twenty years later, a great warka tree stands where she worked. We, her grandchildren, play in its shade."
+      "narration": "ከሃያ ዓመት በኋላ፣ እሷ ትሠራበት በነበረው ቦታ ግዙፍ ዋርካ ቆሟል።",
+      "subtitle_en": "Twenty years later, a great warka tree stands where she worked."
     },
     {
       "id": "s10",
-      "reason": "Closes the loop: the story passes from her to my parents to me, which is why the film exists.",
+      "reason": "Joy before the close: the grandchildren playing under the tree she planted, so the audience feels what the waiting bought.",
       "shot_size": "medium",
-      "duration_s": 9,
+      "duration_s": 6,
       "characters": [
-        "children"
+        "kids"
       ],
-      "image_prompt": "Medium shot from behind of two adults and two small children sitting in the shade of a huge tree, looking up at its branches, warm evening light",
-      "motion_prompt": "Camera slowly pulls back, dappled light moves across them.",
+      "image_prompt": "Medium shot of several small children laughing and playing tag in the dappled shade under a huge spreading warka fig tree, thick roots and trunk beside them, golden evening light, joyful movement",
+      "motion_prompt": "Camera holds steady, the children run and laugh, leaves and dappled light move gently.",
       "fallback": "ken_burns",
-      "narration": "ማን እንደተከለው ስንጠይቅ፣ ወላጆቼ ፈገግ ብለው ስለ እሷ፣ ሃያ ዓመት ስለጠበቀው ዘር ይነግሩናል።",
-      "subtitle_en": "When we ask who planted it, my parents smile and tell us about her, and about a seed that waited twenty years."
+      "narration": "እኛ የልጅ ልጆቿ በጥላው ሥር እንጫወታለን።",
+      "subtitle_en": "We, her grandchildren, play in its shade."
+    },
+    {
+      "id": "s11",
+      "reason": "Closes the loop: the story passes from her to my mother to me. The memory cloud shows Grandmother planting, so the film ends on her, not on us.",
+      "shot_size": "medium",
+      "duration_s": 10,
+      "characters": [
+        "mother",
+        "child"
+      ],
+      "image_prompt": "Medium shot in the shade of a huge warka tree: a small child looks up at his mother, who sits smiling and gazing upward; above the mother's head floats a small soft watercolour memory cloud containing a tiny painted scene of an elderly grandmother in a white shawl kneeling to plant a seed beside a stone wall; thick tree trunk behind them, warm evening light",
+      "motion_prompt": "Camera holds steady, the memory cloud glows softly and drifts slightly, the mother's scarf moves in the breeze.",
+      "fallback": "ken_burns",
+      "narration": "ማን እንደተከለው እናቴን ጠየቅኳት። ፈገግ አለችና፣ ስለ አያቴ፣ ሃያ ዓመት ስለጠበቀው ዘር ነገረችኝ።",
+      "subtitle_en": "I asked my mother who planted it. She smiled and told me about my grandmother, and the seed that waited twenty years."
     }
   ],
   "music": {
@@ -167,7 +197,7 @@
     "instrumental": true,
     "bpm": 68,
     "key": "D minor",
-    "duration_s": 80,
+    "duration_s": 90,
     "chosen_candidate": null,
     "cues": [
       {
@@ -196,7 +226,11 @@
       },
       {
         "at_shot": "s10",
-        "note": "resolves and fades out into the end card"
+        "note": "playful and light, the theme at its warmest while the children play"
+      },
+      {
+        "at_shot": "s11",
+        "note": "resolves, the opening theme returns once and fades out into the end card"
       }
     ]
   },

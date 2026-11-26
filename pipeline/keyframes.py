@@ -6,8 +6,8 @@ so the look stays fixed and only the shot content changes.
 Cloudflare's flux-1-schnell accepts only prompt and steps: a "seed" field is rejected with
 error 5006 (tested 25 Nov 2026), so the look is held by the style block and character
 descriptions alone, not by a fixed seed. There is also no width/height, so every
-keyframe is a 1024x1024 square. assemble.py and the Wan notebook crop it to 9:16 / 16:9,
-which is why FRAMING asks for a centred subject.
+keyframe is a 1024x1024 square. assemble.py fits it to 9:16 / 16:9 with blurred fill when
+cropping would remove too much of the image, which is why FRAMING asks for a centred subject.
 
 Usage:
   python pipeline/keyframes.py              all shots (cached ones are skipped)
