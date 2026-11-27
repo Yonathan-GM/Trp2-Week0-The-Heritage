@@ -17,12 +17,7 @@ tmp/
 .DS_Store
 
 # outputs: keep only what we want
-outputs/assemble/
-outputs/voice_test/
-*.mp4
 
-# films are hosted elsewhere (see outputs/final/README.md)
-*.mp4
 
 # secrets
 .env

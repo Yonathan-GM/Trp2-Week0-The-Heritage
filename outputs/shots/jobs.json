@@ -1,0 +1,123 @@
+[
+  {
+    "id": "s09",
+    "keyframe": "keyframes/s09.png",
+    "motion_prompt": "Slow upward tilt along the trunk to the canopy, leaves move gently.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "b106b758357e6e80"
+  },
+  {
+    "id": "s08",
+    "keyframe": "keyframes/s08.png",
+    "motion_prompt": "Static camera, rain falls, the shoot sways slightly.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "9ad580c3a71723aa"
+  },
+  {
+    "id": "s01",
+    "keyframe": "keyframes/s01.png",
+    "motion_prompt": "Camera slowly pushes in, mist drifts across the hills, her shawl moves gently in the breeze.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "5318c7efc1ad11f6"
+  },
+  {
+    "id": "s02",
+    "keyframe": "keyframes/s02.png",
+    "motion_prompt": "Static camera, soil is brushed gently over the seed, soft dust in the light.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "0729c5f972769dc6"
+  },
+  {
+    "id": "s03",
+    "keyframe": "keyframes/s03.png",
+    "motion_prompt": "Camera holds steady, water pours slowly, the seedling droops slightly.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "87e171b8d4e5819d"
+  },
+  {
+    "id": "s04",
+    "keyframe": "keyframes/s04.png",
+    "motion_prompt": "Camera holds steady, goats move slowly, her shawl stirs in the wind.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "e73bc5e7f80d6ccf"
+  },
+  {
+    "id": "s05",
+    "keyframe": "keyframes/s05.png",
+    "motion_prompt": "Slow pan right across the villagers to the grandmother, gentle breeze.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "51b2dfba9da134eb"
+  },
+  {
+    "id": "s06",
+    "keyframe": "keyframes/s06.png",
+    "motion_prompt": "Very slow push-in, soft light flicker, camera otherwise still.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "8e9aaaf20f37a88f"
+  },
+  {
+    "id": "s07",
+    "keyframe": "keyframes/s07.png",
+    "motion_prompt": "Static camera, grass sways slightly, the light fades slowly.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "f6d34a6eed5741a4"
+  },
+  {
+    "id": "s10",
+    "keyframe": "keyframes/s10.png",
+    "motion_prompt": "Camera holds steady, the children run and laugh, leaves and dappled light move gently.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "c38ed7318805601f"
+  },
+  {
+    "id": "s11",
+    "keyframe": "keyframes/s11.png",
+    "motion_prompt": "Camera holds steady, the memory cloud glows softly and drifts slightly, the mother's scarf moves in the breeze.",
+    "seed": 0,
+    "width": 480,
+    "height": 832,
+    "num_frames": 121,
+    "steps": 30,
+    "hash": "f169ff60e9cb1dc2"
+  }
+]
