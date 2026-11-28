@@ -22,15 +22,21 @@ import argparse
 import array
 import hashlib
 import json
-import math
 import re
 import subprocess
 import textwrap
 import wave
+from pathlib import Path
+from typing import Any
 
-from common import OUT, log_run
-from validate import load
-from radio_cut import RATE, prepare, read_pcm
+try:
+    from .common import OUT, log_run
+    from .radio_cut import RATE, prepare, read_pcm
+    from .validate import load
+except ImportError:
+    from common import OUT, log_run
+    from radio_cut import RATE, prepare, read_pcm
+    from validate import load
 
 # ---- settings you may tune -------------------------------------------------
 FPS = 24
@@ -42,9 +48,9 @@ TARGET_TP = -1
 SUB_MAX_CHARS = 40
 SUB_MAX_LINES = 2
 FORMATS = {"vertical": (1080, 1920), "horizontal": (1920, 1080)}
-SUB_BOTTOM = {"vertical": 0.80, "horizontal": 0.90}
+SUB_BOTTOM = {"vertical": 0.80, "horizontal": 0.90}   # bottom of subtitle block, fraction of height (safe area)
 FIT = {"vertical": "cover", "horizontal": "contain"}   # cover: picture fills the frame; contain: whole picture on a blurred copy
-ZOOM = 0.08            # total slow zoom during a Ken Burns shot (8 %)   # bottom of subtitle block, fraction of height (safe area)
+ZOOM = 0.08            # total slow zoom during a Ken Burns shot (8 %)
 
 # where earlier pipeline steps are assumed to write; change here if yours differ
 CLIP_DIRS = [OUT / "clips", OUT / "shots", OUT / "video"]
@@ -59,32 +65,54 @@ FONT_CANDIDATES = [
 
 
 # ---- small helpers ---------------------------------------------------------
-def ff(args, what, check=True):
-    r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *map(str, args)],
-                       capture_output=True, text=True)
+def ff(args: list[Any], what: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run ffmpeg with standard error-level logging and optional failure exit."""
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *map(str, args)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     if check and r.returncode:
         raise SystemExit(f"ffmpeg failed ({what}):\n{r.stderr[-1800:]}")
     return r
 
 
-def probe_video(path):
-    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
-                        "-show_entries", "stream=width,height", "-of", "json", str(path)],
-                       capture_output=True, text=True, check=True)
+def probe_video(path: Path) -> tuple[int, int]:
+    """Return (width, height) of the first video stream."""
+    r = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=width,height", "-of", "json", str(path),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
     s = json.loads(r.stdout)["streams"][0]
     return int(s["width"]), int(s["height"])
 
 
-def duration(path):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                        "-of", "default=nw=1:nk=1", str(path)], capture_output=True, text=True)
+def duration(path: Path) -> float:
+    """Return container duration in seconds, or 0.0 if unreadable."""
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     try:
         return float(r.stdout.strip())
     except ValueError:
         return 0.0
 
 
-def write_wav(path, pcm, rate):
+def write_wav(path: Path, pcm: array.array, rate: int) -> None:
+    """Write mono 16-bit PCM samples to a WAV file."""
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
@@ -92,7 +120,8 @@ def write_wav(path, pcm, rate):
         w.writeframes(pcm.tobytes())
 
 
-def find_file(dirs, exts, sid):
+def find_file(dirs: list[Path], exts: set[str], sid: str) -> Path | None:
+    """Find the most recently modified file matching a shot id across candidate directories."""
     hits = []
     for d in dirs:
         if d.is_dir():
@@ -102,7 +131,8 @@ def find_file(dirs, exts, sid):
     return max(hits, key=lambda p: p.stat().st_mtime) if hits else None
 
 
-def find_source(sid):
+def find_source(sid: str) -> tuple[str, Path | None]:
+    """Resolve the best available visual source for a shot: clip > image > placeholder."""
     clip = find_file(CLIP_DIRS, {".mp4", ".mov", ".webm"}, sid)
     if clip:
         return "clip", clip
@@ -112,11 +142,14 @@ def find_source(sid):
     return "placeholder", None
 
 
-def find_music(sb):
+def find_music(sb: dict[str, Any]) -> Path | None:
+    """Locate the music track: score.wav first, then chosen_candidate, then any fallback audio."""
     if not MUSIC_DIR.is_dir():
         return None
-    files = sorted(p for p in MUSIC_DIR.rglob("*")
-                   if p.suffix.lower() in {".wav", ".mp3", ".flac", ".m4a", ".ogg"})
+    files = sorted(
+        p for p in MUSIC_DIR.rglob("*")
+        if p.suffix.lower() in {".wav", ".mp3", ".flac", ".m4a", ".ogg"}
+    )
     if not files:
         return None
     score = MUSIC_DIR / "score.wav"
@@ -130,18 +163,22 @@ def find_music(sb):
     for p in files:
         if "chosen" in p.stem.lower() or p.stem.lower() == "music":
             return p
-    print(f"WARNING: music.chosen_candidate is null; using {files[0].name}. "
-          f"Set it in storyboard.json once you have picked one.")
+    print(
+        f"WARNING: music.chosen_candidate is null; using {files[0].name}. "
+        "Set it in storyboard.json once you have picked one."
+    )
     return files[0]
 
 
 # ---- subtitles -------------------------------------------------------------
-def smart(text):
+def smart(text: str) -> str:
+    """Convert straight apostrophes to typographic single quotes."""
     text = re.sub(r"(^|[\s(\[])'", lambda m: m.group(1) + "\u2018", text)
     return text.replace("'", "\u2019")
 
 
-def break_long(s, limit):
+def break_long(s: str, limit: int) -> list[str]:
+    """Recursively split strings exceeding `limit` near commas or the midpoint."""
     if len(s) <= limit:
         return [s]
     mid = len(s) // 2
@@ -152,10 +189,13 @@ def break_long(s, limit):
     return break_long(s[:best].strip(), limit) + break_long(s[best:].strip(), limit)
 
 
-def split_chunks(text):
+def split_chunks(text: str) -> list[str]:
+    """Split subtitle text into sentence-aware chunks that fit within two lines."""
     limit = SUB_MAX_CHARS * SUB_MAX_LINES - 10   # slack so two balanced lines always fit
     chunks, cur = [], ""
     for sentence in re.split(r"(?<=[.!?])\s+", smart(text.strip())):
+        if not sentence:
+            continue
         for piece in break_long(sentence, limit):
             if cur and len(cur) + 1 + len(piece) <= limit:
                 cur += " " + piece
@@ -168,7 +208,8 @@ def split_chunks(text):
     return chunks
 
 
-def balance(chunk):
+def balance(chunk: str) -> list[str]:
+    """Wrap a subtitle chunk into at most SUB_MAX_LINES balanced lines."""
     for width in range(max(len(chunk) // 2, 10), SUB_MAX_CHARS + 1):
         lines = textwrap.wrap(chunk, width)
         if len(lines) <= SUB_MAX_LINES:
@@ -176,9 +217,11 @@ def balance(chunk):
     return textwrap.wrap(chunk, SUB_MAX_CHARS)
 
 
-def make_cues(text, voice_s):
-    """List of (start, end, lines) in seconds from the start of the shot, spread over the voice."""
+def make_cues(text: str, voice_s: float) -> list[list[Any]]:
+    """Return [(start, end, lines), ...] in seconds from shot start, proportional to chunk length."""
     chunks = split_chunks(text)
+    if not chunks:
+        return []
     total = sum(len(c) for c in chunks)
     span = max(voice_s, 1.0)
     t, cues = 0.1, []
@@ -190,7 +233,8 @@ def make_cues(text, voice_s):
     return cues
 
 
-def load_font(size):
+def load_font(size: int):
+    """Load the first available TrueType font, falling back to Pillow's default."""
     from PIL import ImageFont
     for f in FONT_CANDIDATES:
         try:
@@ -200,8 +244,19 @@ def load_font(size):
     return ImageFont.load_default()
 
 
-def render_text_png(lines, W, H, path, y_anchor, size_frac, boxed, centered=False):
+def render_text_png(
+    lines: list[str],
+    W: int,
+    H: int,
+    path: Path,
+    y_anchor: float,
+    size_frac: float,
+    boxed: bool,
+    centered: bool = False,
+) -> None:
+    """Render transparent RGBA subtitle or title card PNG."""
     from PIL import Image, ImageDraw
+    lines = lines or [""]
     size = int(min(W, H) * size_frac)
     max_w = int(W * 0.84)
     while True:
@@ -218,17 +273,27 @@ def render_text_png(lines, W, H, path, y_anchor, size_frac, boxed, centered=Fals
     if boxed:
         pad = int(size * 0.45)
         bw = max(widths)
-        d.rounded_rectangle((W / 2 - bw / 2 - pad, top - pad * 0.4, W / 2 + bw / 2 + pad,
-                             top + block_h + pad * 0.1), radius=int(size * 0.4), fill=(0, 0, 0, 150))
+        d.rounded_rectangle(
+            (W / 2 - bw / 2 - pad, top - pad * 0.4, W / 2 + bw / 2 + pad, top + block_h + pad * 0.1),
+            radius=int(size * 0.4),
+            fill=(0, 0, 0, 150),
+        )
     for i, l in enumerate(lines):
         w = font.getlength(l)
-        d.text(((W - w) / 2, top + i * line_h), l, font=font, fill=(255, 255, 255, 255),
-               stroke_width=max(1, size // 18), stroke_fill=(0, 0, 0, 255))
+        d.text(
+            ((W - w) / 2, top + i * line_h),
+            l,
+            font=font,
+            fill=(255, 255, 255, 255),
+            stroke_width=max(1, size // 18),
+            stroke_fill=(0, 0, 0, 255),
+        )
     img.save(path)
 
 
 # ---- audio -----------------------------------------------------------------
-def build_voice(sb, end_s):
+def build_voice(sb: dict[str, Any], end_s: float) -> tuple[array.array, list[dict[str, Any]]]:
+    """Concatenate prepared narration clips into a single voice track and timeline."""
     voice = array.array("h")
     timeline, report = [], []
     for shot in sb["shots"]:
@@ -240,26 +305,32 @@ def build_voice(sb, end_s):
         slot = max(shot["duration_s"], secs + 0.4)
         timeline.append({"shot": shot, "start": len(voice) / RATE, "voice_s": secs, "slot": slot})
         voice.extend(pcm)
-        voice.extend(array.array("h", bytes(2 * (int(slot * RATE) - len(pcm)))))
+        voice.extend(array.array("h", bytes(2 * max(0, int(slot * RATE) - len(pcm)))))
     voice.extend(array.array("h", bytes(2 * int(end_s * RATE))))
     return voice, timeline
 
 
-def mix_audio(voice_wav, music, total, out_wav):
+def mix_audio(voice_wav: Path, music: Path | None, total: float, out_wav: Path) -> None:
+    """Sidechain-duck the music bed under narration and mix to stereo 48 kHz WAV."""
     if music:
         music_in = ["-i", music]
     else:
-        music_in = ["-f", "lavfi", "-i",
-                    f"aevalsrc=0.3*(sin(2*PI*146.83*t)+sin(2*PI*220*t)):s=48000:d={total:.2f}"]
+        music_in = [
+            "-f", "lavfi", "-i",
+            f"aevalsrc=0.3*(sin(2*PI*146.83*t)+sin(2*PI*220*t)):s=48000:d={total:.2f}",
+        ]
     fmt = "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo"
+    fade_out_st = max(0.0, total - 3.0)
 
-    def graph(new_amix):
+    def graph(new_amix: bool) -> str:
         mix = "amix=inputs=2:duration=first:normalize=0" if new_amix else "amix=inputs=2:duration=first,volume=2"
-        return (f"[0:a]{fmt},asplit=2[v1][v2];"
-                f"[1:a]{fmt},volume={MUSIC_GAIN},atrim=0:{total:.2f},apad=whole_dur={total:.2f},"
-                f"afade=t=in:d=2,afade=t=out:st={total - 3:.2f}:d=3[m];"
-                f"[m][v1]sidechaincompress=threshold=0.02:ratio=6:attack=300:release=1500[duck];"
-                f"[duck][v2]{mix}[mix]")
+        return (
+            f"[0:a]{fmt},asplit=2[v1][v2];"
+            f"[1:a]{fmt},volume={MUSIC_GAIN},atrim=0:{total:.2f},apad=whole_dur={total:.2f},"
+            f"afade=t=in:d=2,afade=t=out:st={fade_out_st:.2f}:d=3[m];"
+            f"[m][v1]sidechaincompress=threshold=0.02:ratio=6:attack=300:release=1500[duck];"
+            f"[duck][v2]{mix}[mix]"
+        )
 
     for new_amix in (True, False):
         r = ff(["-i", voice_wav, *music_in, "-filter_complex", graph(new_amix), "-map", "[mix]",
@@ -269,44 +340,61 @@ def mix_audio(voice_wav, music, total, out_wav):
     raise SystemExit(f"ffmpeg failed (audio mix):\n{r.stderr[-1800:]}")
 
 
-def measure(src):
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(src), "-af",
-                        f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA=11:print_format=json",
-                        "-f", "null", "-"], capture_output=True, text=True)
+def measure(src: Path) -> dict[str, Any]:
+    """Run FFmpeg loudnorm first pass to measure integrated loudness and true peak."""
+    r = subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-nostats", "-i", str(src), "-af",
+            f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA=11:print_format=json",
+            "-f", "null", "-",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr, re.S)
     if not m:
         raise SystemExit("Could not measure loudness:\n" + r.stderr[-800:])
     return json.loads(m.group(0))
 
 
-def normalise(src, dst):
+def normalise(src: Path, dst: Path) -> None:
+    """Two-pass EBU R128 loudness normalisation to TARGET_LUFS / TARGET_TP."""
     s = measure(src)
-    af = (f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA=11:measured_I={s['input_i']}:"
-          f"measured_LRA={s['input_lra']}:measured_TP={s['input_tp']}:"
-          f"measured_thresh={s['input_thresh']}:offset={s['target_offset']}:linear=true,aresample=48000")
+    af = (
+        f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA=11:measured_I={s['input_i']}:"
+        f"measured_LRA={s['input_lra']}:measured_TP={s['input_tp']}:"
+        f"measured_thresh={s['input_thresh']}:offset={s['target_offset']}:linear=true,aresample=48000"
+    )
     ff(["-i", src, "-af", af, "-ar", 48000, "-ac", 2, dst], "loudness normalisation")
     after = measure(dst)
-    print(f"Audio loudness: before {float(s['input_i']):.1f} LUFS, "
-          f"after {float(after['input_i']):.1f} LUFS, true peak {float(after['input_tp']):.1f} dBTP "
-          f"(target {TARGET_LUFS} / {TARGET_TP})")
+    print(
+        f"Audio loudness: before {float(s['input_i']):.1f} LUFS, "
+        f"after {float(after['input_i']):.1f} LUFS, true peak {float(after['input_tp']):.1f} dBTP "
+        f"(target {TARGET_LUFS} / {TARGET_TP})"
+    )
 
 
 # ---- video -----------------------------------------------------------------
-def fit_graph(inp, W, H, sw, sh, out):
+def fit_graph(inp: str, W: int, H: int, sw: int, sh: int, out: str) -> str:
     """Filter text turning the source into exactly W x H: crop if the shapes are close, else blurred fill."""
     if abs((sw / sh) / (W / H) - 1) <= MAX_CROP:
         return f"[{inp}]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1[{out}]"
-    return (f"[{inp}]split[fa][fb];"
-            f"[fa]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=30:5,eq=brightness=-0.08[fbg];"
-            f"[fb]scale={W}:{H}:force_original_aspect_ratio=decrease[ffg];"
-            f"[fbg][ffg]overlay=(W-w)/2:(H-h)/2,setsar=1[{out}]")
+    return (
+        f"[{inp}]split[fa][fb];"
+        f"[fa]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=30:5,eq=brightness=-0.08[fbg];"
+        f"[fb]scale={W}:{H}:force_original_aspect_ratio=decrease[ffg];"
+        f"[fbg][ffg]overlay=(W-w)/2:(H-h)/2,setsar=1[{out}]"
+    )
 
 
-def smoothstep(p):
+def smoothstep(p: float) -> float:
+    """Cubic ease-in/out curve over [0, 1]."""
     return p * p * (3 - 2 * p)
 
 
-def kb_frames(path, W, H, n, idx, fit):
+def kb_frames(path: Path, W: int, H: int, n: int, idx: int, fit: str):
     """Yield n raw RGB frames of a slow pan/zoom over one picture, smooth to the sub-pixel.
 
     fit="cover":   the picture fills the frame (the sides are cropped, so keep subjects centred).
@@ -314,7 +402,7 @@ def kb_frames(path, W, H, n, idx, fit):
     The crop box uses float coordinates, so there is no pixel stepping (the shake that
     ffmpeg's zoompan filter produced).
     """
-    from PIL import Image, ImageEnhance
+    from PIL import Image, ImageEnhance, ImageFilter
     src = Image.open(path).convert("RGB")
     sw, sh = src.size
     bg = None
@@ -333,7 +421,6 @@ def kb_frames(path, W, H, n, idx, fit):
         left, top = (big.width - W) // 2, (big.height - H) // 2
         bg = big.crop((left, top, left + W, top + H))
         bg = bg.resize((max(2, W // 8), max(2, H // 8)), Image.BILINEAR)
-        from PIL import ImageFilter
         bg = bg.filter(ImageFilter.GaussianBlur(4)).resize((W, H), Image.BICUBIC)
         bg = ImageEnhance.Brightness(bg).enhance(0.8)
     zoom_in = idx % 2 == 0
@@ -353,15 +440,27 @@ def kb_frames(path, W, H, n, idx, fit):
         yield frame.tobytes()
 
 
-def make_segment(idx, tl, W, H, work, sub_bottom, fit):
+def make_segment(
+    idx: int,
+    tl: dict[str, Any],
+    W: int,
+    H: int,
+    work: Path,
+    sub_bottom: float,
+    fit: str,
+) -> tuple[Path, str]:
+    """Render and cache one shot segment MP4 with burned-in subtitles and edge fades."""
     shot, slot = tl["shot"], tl["slot"]
     n = max(1, round(slot * FPS))
     kind, src = find_source(shot["id"])
     cues = make_cues(shot["subtitle_en"], tl["voice_s"])
     stat = src.stat() if src else None
-    key = hashlib.sha1(json.dumps([str(src), stat.st_mtime_ns if stat else 0, stat.st_size if stat else 0,
-                                   cues, W, H, round(slot, 3), idx % 4, FADE_S, FPS, fit, ZOOM, "kb2"]
-                                  ).encode()).hexdigest()[:8]
+    key = hashlib.sha1(
+        json.dumps(
+            [str(src), stat.st_mtime_ns if stat else 0, stat.st_size if stat else 0,
+             cues, W, H, round(slot, 3), idx % 4, FADE_S, FPS, fit, ZOOM, "kb2"]
+        ).encode()
+    ).hexdigest()[:8]
     out = work / "segments" / f"{shot['id']}_{W}x{H}_{key}.mp4"
     if out.exists():
         return out, kind
@@ -374,12 +473,16 @@ def make_segment(idx, tl, W, H, work, sub_bottom, fit):
 
     frames = None
     if kind == "clip":
+        assert src is not None
         sw, sh = probe_video(src)
-        inputs = ["-i", src]
-        graph = (f"[0:v]setpts={stretch_of(src, slot):.4f}*PTS,fps={FPS}[src];"
-                 + fit_graph("src", W, H, sw, sh, "fit") +
-                 f";[fit]tpad=stop_mode=clone:stop_duration={slot:.2f}[base]")
+        inputs: list[Any] = ["-i", src]
+        graph = (
+            f"[0:v]setpts={stretch_of(src, slot):.4f}*PTS,fps={FPS}[src];"
+            + fit_graph("src", W, H, sw, sh, "fit")
+            + f";[fit]tpad=stop_mode=clone:stop_duration={slot:.2f}[base]"
+        )
     elif kind == "image":
+        assert src is not None
         inputs = ["-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", FPS, "-i", "-"]
         graph = "[0:v]null[base]"
         frames = kb_frames(src, W, H, n, idx, fit)
@@ -393,8 +496,11 @@ def make_segment(idx, tl, W, H, work, sub_bottom, fit):
         graph += f";[{prev}][{k + 1}:v]overlay=0:0:enable='between(t,{t0:.2f},{t1:.2f})'[v{k + 1}]"
         prev = f"v{k + 1}"
     if FADE_S > 0:
-        graph += (f";[{prev}]fade=t=in:st=0:d={FADE_S},fade=t=out:st={slot - FADE_S:.2f}:d={FADE_S},"
-                  f"format=yuv420p[out]")
+        fade_out_st = max(0.0, slot - FADE_S)
+        graph += (
+            f";[{prev}]fade=t=in:st=0:d={FADE_S},fade=t=out:st={fade_out_st:.2f}:d={FADE_S},"
+            "format=yuv420p[out]"
+        )
     else:
         graph += f";[{prev}]format=yuv420p[out]"
 
@@ -407,11 +513,17 @@ def make_segment(idx, tl, W, H, work, sub_bottom, fit):
         cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *map(str, args)]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
+            assert proc.stdin is not None
             for fr in frames:
                 proc.stdin.write(fr)
+            proc.stdin.close()
         except BrokenPipeError:
             pass
-        proc.stdin.close()
+        except Exception:
+            proc.kill()
+            proc.wait()
+            raise
+        assert proc.stderr is not None
         err = proc.stderr.read().decode(errors="replace")
         if proc.wait():
             raise SystemExit(f"ffmpeg failed (segment {shot['id']}):\n{err[-1800:]}")
@@ -419,33 +531,49 @@ def make_segment(idx, tl, W, H, work, sub_bottom, fit):
     return out, kind
 
 
-def stretch_of(src, slot, max_stretch=2.0):
+def stretch_of(src: Path, slot: float, max_stretch: float = 2.0) -> float:
     """Slow-down factor so a short Wan clip fills more of its slot (the rest is held)."""
     d = duration(src)
     return min(max(slot / d, 1.0), max_stretch) if d > 0 else 1.0
 
 
-def make_end_card(sb, W, H, work):
+def make_end_card(sb: dict[str, Any], W: int, H: int, work: Path) -> Path:
+    """Render and cache the AI-disclosure end card video segment."""
+    text = sb["end_card"]["text"]
     secs = float(sb["end_card"]["duration_s"])
-    png = work / "subs" / f"endcard_{W}x{H}.png"
-    render_text_png([sb["end_card"]["text"]], W, H, png, H / 2, 0.07, boxed=False, centered=True)
-    out = work / "segments" / f"endcard_{W}x{H}.mp4"
-    graph = (f"[0:v][1:v]overlay=0:0,fade=t=in:st=0:d=0.5,fade=t=out:st={secs - 0.5:.2f}:d=0.5,"
-             f"format=yuv420p[out]")
-    ff(["-f", "lavfi", "-i", f"color=c=0x1e1812:s={W}x{H}:r={FPS}:d={secs}", "-i", png,
-        "-filter_complex", graph, "-map", "[out]", "-t", f"{secs:.3f}", "-r", FPS, "-an",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", 18, out], "end card")
+    key = hashlib.sha1(json.dumps([text, secs, W, H, FPS]).encode()).hexdigest()[:8]
+    out = work / "segments" / f"endcard_{W}x{H}_{key}.mp4"
+    if out.exists():
+        return out
+    png = work / "subs" / f"endcard_{W}x{H}_{key}.png"
+    render_text_png([text], W, H, png, H / 2, 0.07, boxed=False, centered=True)
+    fade_out_st = max(0.0, secs - 0.5)
+    graph = (
+        f"[0:v][1:v]overlay=0:0,fade=t=in:st=0:d=0.5,fade=t=out:st={fade_out_st:.2f}:d=0.5,"
+        "format=yuv420p[out]"
+    )
+    tmp = out.with_name(out.stem + "_tmp.mp4")
+    ff(
+        [
+            "-f", "lavfi", "-i", f"color=c=0x1e1812:s={W}x{H}:r={FPS}:d={secs}", "-i", png,
+            "-filter_complex", graph, "-map", "[out]", "-t", f"{secs:.3f}", "-r", FPS, "-an",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", 18, tmp,
+        ],
+        "end card",
+    )
+    tmp.replace(out)
     return out
 
 
-def concat(segs, out, work, name):
+def concat(segs: list[Path], out: Path, work: Path, name: str) -> None:
+    """Concatenate rendered MP4 segments without re-encoding."""
     lst = work / f"concat_{name}.txt"
     lst.write_text("".join(f"file '{p.as_posix()}'\n" for p in segs), encoding="utf-8")
     ff(["-f", "concat", "-safe", 0, "-i", lst, "-c", "copy", out], "concat")
 
 
 # ---- main ------------------------------------------------------------------
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(FORMATS))
     ap.add_argument("--draft", action="store_true", help="half size, for fast checks")
@@ -491,17 +619,28 @@ def main():
         video = work / f"video_{name}.mp4"
         concat(segs, video, work, name)
         out = final / f"film_{name}{'_draft' if args.draft else ''}.mp4"
-        ff(["-i", video, "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
-            "-b:a", "192k", "-movflags", "+faststart", "-shortest", out], "final mux")
+        ff(
+            [
+                "-i", video, "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
+                "-b:a", "192k", "-movflags", "+faststart", "-shortest", out,
+            ],
+            "final mux",
+        )
         print(f"  wrote {out}  (video {duration(video):.1f} s, file {duration(out):.1f} s)")
         last = out
 
     missing = [s for s, k in kinds.items() if k == "placeholder"]
     kb = [s for s, k in kinds.items() if k == "image"]
-    print(f"\nWan clips: {sum(1 for k in kinds.values() if k == 'clip')}, "
-          f"Ken Burns from keyframe: {len(kb)} {kb}, placeholder cards: {len(missing)} {missing}")
-    log_run("assemble", "ffmpeg", {"total_s": round(total, 1), "draft": args.draft,
-                                   "placeholders": len(missing)}, output=last)
+    print(
+        f"\nWan clips: {sum(1 for k in kinds.values() if k == 'clip')}, "
+        f"Ken Burns from keyframe: {len(kb)} {kb}, placeholder cards: {len(missing)} {missing}"
+    )
+    log_run(
+        "assemble",
+        "ffmpeg",
+        {"total_s": round(total, 1), "draft": args.draft, "placeholders": len(missing)},
+        output=last,
+    )
 
 
 if __name__ == "__main__":

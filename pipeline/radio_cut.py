@@ -16,9 +16,14 @@ import math
 import re
 import subprocess
 import wave
+from pathlib import Path
 
-from common import OUT, log_run
-from validate import load
+try:
+    from .common import OUT, log_run
+    from .validate import load
+except ImportError:
+    from common import OUT, log_run
+    from validate import load
 
 RATE = 24000
 TAIL_S = 2.0
@@ -29,17 +34,20 @@ FRAME = RATE // 100  # 10 ms analysis window
 TRIM_TAIL_MS = 0
 
 
-def read_pcm(path):
+def read_pcm(path: str | Path) -> array.array:
+    """Read a 24 kHz mono 16-bit WAV file into a signed 16-bit PCM array."""
     with wave.open(str(path), "rb") as w:
         if w.getframerate() != RATE or w.getnchannels() != 1 or w.getsampwidth() != 2:
-            raise SystemExit(f"{path}: expected 24 kHz mono 16-bit, got "
-                             f"{w.getframerate()} Hz, {w.getnchannels()} ch, {8 * w.getsampwidth()} bit")
+            raise SystemExit(
+                f"{path}: expected 24 kHz mono 16-bit, got "
+                f"{w.getframerate()} Hz, {w.getnchannels()} ch, {8 * w.getsampwidth()} bit"
+            )
         pcm = array.array("h")
         pcm.frombytes(w.readframes(w.getnframes()))
         return pcm
 
 
-def envelope_db(pcm):
+def envelope_db(pcm: array.array) -> list[float]:
     """Loudness in dB for each 10 ms window."""
     env = []
     for i in range(0, len(pcm) - FRAME + 1, FRAME):
@@ -49,7 +57,7 @@ def envelope_db(pcm):
     return env
 
 
-def trim_artifact_tail(pcm, min_gap_ms=120, max_artifact_ms=250):
+def trim_artifact_tail(pcm: array.array, min_gap_ms: int = 120, max_artifact_ms: int = 250) -> tuple[array.array, int, bool]:
     """Cut trailing silence, and any short burst that follows a pause at the end of the clip.
 
     A genuine last word is longer than max_artifact_ms; a click or hiss from the TTS is not.
@@ -87,7 +95,8 @@ def trim_artifact_tail(pcm, min_gap_ms=120, max_artifact_ms=250):
     return pcm[:end], round((len(pcm) - end) / RATE * 1000), burst
 
 
-def prepare(pcm, shot_id, report):
+def prepare(pcm: array.array, shot_id: str, report: list[tuple]) -> array.array:
+    """Trim trailing TTS artifacts, log diagnostics, and remove DC offset/edge clicks."""
     env = envelope_db(pcm)
     n = len(env) // 5 * 5
     tail = [round(max(env[k:k + 5])) for k in range(max(0, n - 60), n, 5)]  # last 600 ms, 50 ms steps
@@ -98,7 +107,7 @@ def prepare(pcm, shot_id, report):
     return declick(pcm)
 
 
-def declick(pcm):
+def declick(pcm: array.array) -> array.array:
     """Remove DC offset and fade the edges so joins between clips do not click."""
     if not len(pcm):
         return pcm
@@ -112,14 +121,15 @@ def declick(pcm):
     return out
 
 
-def db(samples):
+def db(samples: array.array) -> float:
+    """Return RMS loudness in dBFS for a PCM array."""
     if not len(samples):
         return -120.0
     rms = math.sqrt(sum(s * s for s in samples) / len(samples)) / 32768
     return 20 * math.log10(rms) if rms > 0 else -120.0
 
 
-def main():
+def main() -> None:
     sb = load()
     voice = array.array("h")
     report = []
@@ -134,10 +144,12 @@ def main():
         note = ""
         if slot > shot["duration_s"]:
             note = f"voice too long: set duration_s to {min(12, round(slot + 0.5))} in storyboard.json"
-        print(f"{shot['id']:5s} {len(voice) / RATE:6.1f} {secs:6.1f} {slot:6.1f}  {note}"
-              f"{'   <-- SILENT FILE' if db(pcm) < -50 else ''}")
+        print(
+            f"{shot['id']:5s} {len(voice) / RATE:6.1f} {secs:6.1f} {slot:6.1f}  {note}"
+            f"{'   <-- SILENT FILE' if db(pcm) < -50 else ''}"
+        )
         voice.extend(pcm)
-        voice.extend(array.array("h", bytes(2 * (int(slot * RATE) - len(pcm)))))
+        voice.extend(array.array("h", bytes(2 * max(0, int(slot * RATE) - len(pcm)))))
     print("\nTail check: loudness (dB) of the last 600 ms of each raw clip, in 50 ms steps")
     for sid, ms, burst, tail in report:
         print(f"{sid}  trimmed {ms:4d} ms  {'ARTIFACT BURST REMOVED' if burst else '':22s} {tail}")
@@ -148,8 +160,10 @@ def main():
     voice_db = db(voice)
     print(f"Voice track level: {voice_db:.1f} dB (about -20 to -10 is normal)")
     if voice_db < -50:
-        raise SystemExit("The voice track is silent: the narration files contain no sound. "
-                         "Re-check outputs/narration/*.wav in a player.")
+        raise SystemExit(
+            "The voice track is silent: the narration files contain no sound. "
+            "Re-check outputs/narration/*.wav in a player."
+        )
 
     env_head = envelope_db(voice[:20 * RATE])
     first = next((i for i, e in enumerate(env_head) if e > -40), None)
@@ -175,25 +189,40 @@ def main():
         w.setsampwidth(2)
         w.setframerate(RATE)
         w.writeframes(mix.tobytes())
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
-                    "-f", "lavfi", "-i", f"color=c=black:s=720x1280:r=24:d={total:.2f}",
-                    "-i", str(wav_out),
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                    "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
-                    "-movflags", "+faststart", "-shortest", str(mp4_out)], check=True)
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", f"color=c=black:s=720x1280:r=24:d={total:.2f}",
+            "-i", str(wav_out),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
+            "-movflags", "+faststart", "-shortest", str(mp4_out),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
     # Verify the MP4 itself, 5 s window by window, instead of trusting the encoder or the player.
     wins = []
-    for t0 in range(0, int(min(total, 40)), 5):
-        chk = subprocess.run(["ffmpeg", "-hide_banner", "-ss", str(t0), "-t", "5", "-i", str(mp4_out),
-                              "-vn", "-af", "volumedetect", "-f", "null", "-"],
-                             capture_output=True, text=True)
+    for t0 in range(0, int(total), 5):
+        chk = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-ss", str(t0), "-t", "5", "-i", str(mp4_out),
+                "-vn", "-af", "volumedetect", "-f", "null", "-",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         m = re.search(r"mean_volume:\s*(-?[\d.]+|-inf) dB", chk.stderr)
         wins.append((t0, float(m.group(1)) if m and m.group(1) != "-inf" else -120.0))
     print("MP4 audio by 5 s window (voice is about -20 dB, drone only about -45 dB):")
     print("  " + "   ".join(f"{a}-{a + 5}s: {v:.0f} dB{'  <-- QUIET' if v < -35 else ''}" for a, v in wins))
-    log_run("radio_cut", "python+ffmpeg", {"shots": len(sb["shots"]), "total_s": round(total, 1)},
-            output=mp4_out)
+    log_run("radio_cut", "python+ffmpeg", {"shots": len(sb["shots"]), "total_s": round(total, 1)}, output=mp4_out)
     print(f"\nWrote {wav_out}\nWrote {mp4_out}")
 
 

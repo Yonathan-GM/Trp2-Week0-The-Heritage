@@ -9,25 +9,50 @@ import time
 
 import requests
 
-from common import env, log_run
+try:
+    from .common import env, log_run
+except ImportError:
+    from common import env, log_run
 
 
-def gemini_text():
-    from common import gemini_text as call
+def addis_tts() -> tuple[str, float]:
+    """Verify Addis AI credentials and voice catalog reachability."""
+    from addisai import AddisAI
+    key = env("ADDIS_API_KEY")
+    t0 = time.time()
+    client = AddisAI(api_key=key)
+    voices = list(client.voices.list(language="am"))
+    if not voices:
+        raise RuntimeError("Addis AI returned an empty Amharic voice list")
+    return "addis-ai:voices.list", time.time() - t0
+
+
+def gemini_text() -> tuple[str, float]:
+    """Verify Gemini text generation fallback chain."""
+    try:
+        from .common import gemini_text as call
+    except ImportError:
+        from common import gemini_text as call
     t0 = time.time()
     model, _ = call("Reply with the single word: ok")
     return model, time.time() - t0
 
 
-def gemini_tts():
+def gemini_tts() -> tuple[str, float]:
+    """Verify Gemini TTS audio generation endpoint."""
     key = env("GEMINI_API_KEY")
     model = "gemini-3.8-flash-tts"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     t0 = time.time()
-    r = requests.post(url, headers={"x-goog-api-key": key}, timeout=120, json={
-    "contents": [{"parts": [{"text": "Say calmly: hello"}]}],
-    "generationConfig": {"responseModalities": ["AUDIO"]},
-})
+    r = requests.post(
+        url,
+        headers={"x-goog-api-key": key},
+        timeout=120,
+        json={
+            "contents": [{"parts": [{"text": "Say calmly: hello"}]}],
+            "generationConfig": {"responseModalities": ["AUDIO"]},
+        },
+    )
     r.raise_for_status()
     part = r.json()["candidates"][0]["content"]["parts"][0]
     assert "inlineData" in part, "no audio returned"
@@ -35,21 +60,31 @@ def gemini_tts():
     return model, time.time() - t0
 
 
-def cloudflare_image():
+def cloudflare_image() -> tuple[str, float]:
+    """Verify Cloudflare Workers AI FLUX.1 schnell endpoint."""
     acct, token = env("CLOUDFLARE_ACCOUNT_ID"), env("CLOUDFLARE_API_TOKEN")
     model = "@cf/black-forest-labs/flux-1-schnell"
     url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
     t0 = time.time()
-    r = requests.post(url, headers={"Authorization": f"Bearer {token}"}, timeout=120,
-                      json={"prompt": "a small clay teapot on a wooden table", "steps": 4})
+    r = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=120,
+        json={"prompt": "a small clay teapot on a wooden table", "steps": 4},
+    )
     r.raise_for_status()
     return model, time.time() - t0
 
 
-CHECKS = [("gemini_text", gemini_text), ("gemini_tts", gemini_tts), ("cloudflare_image", cloudflare_image)]
+CHECKS = [
+    ("addis_tts", addis_tts),
+    ("cloudflare_image", cloudflare_image),
+    ("gemini_text", gemini_text),
+    ("gemini_tts", gemini_tts),
+]
 
 
-def main():
+def main() -> None:
     failed = 0
     for name, fn in CHECKS:
         t0 = time.time()
@@ -59,11 +94,12 @@ def main():
             print(f"[ok]   {name:18s} {latency:6.1f}s  ({model})")
         except Exception as e:  # noqa: BLE001
             failed += 1
-            log_run("smoke", name, {"check": name}, latency_s=time.time() - t0,
-                    ok=False, error=repr(e)[:300])
+            log_run("smoke", name, {"check": name}, latency_s=time.time() - t0, ok=False, error=repr(e)[:300])
             print(f"[FAIL] {name:18s} {e!r}")
-    print("\nKaggle/Colab (Wan 2.2, ACE-Step) cannot be smoke-tested from here: "
-          "run notebooks/ by hand and note the result in FAILURES.md / COSTS.md.")
+    print(
+        "\nKaggle/Colab (Wan 2.2, ACE-Step) cannot be smoke-tested from here: "
+        "run notebooks/ by hand and note the result in FAILURES.md / COSTS.md."
+    )
     sys.exit(1 if failed else 0)
 
 

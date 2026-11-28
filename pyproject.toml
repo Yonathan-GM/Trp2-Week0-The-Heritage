@@ -1,0 +1,22 @@
+[project]
+name = "heritage-short"
+version = "1.0.0"
+description = "Reproducible AI-assisted short film pipeline for 'The Seed That Waited Twenty Years'."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "addisai",
+  "jsonschema>=4.20",
+  "numpy",
+  "pillow",
+  "python-dotenv>=1.0",
+  "requests>=2.31",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 110
+src = ["pipeline", "scripts", "tests", "."]

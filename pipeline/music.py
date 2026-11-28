@@ -9,17 +9,20 @@ music.chosen_candidate in storyboard.json, copy the winner to score.wav, and rec
 why you chose it in EXPERIMENTS.md.
 """
 import json
+from typing import Any
 
-from common import OUT, content_hash, log_run
-from validate import load
+try:
+    from .common import OUT, content_hash, log_run
+    from .validate import load
+except ImportError:
+    from common import OUT, content_hash, log_run
+    from validate import load
 
 
-def main():
-    sb = load()
+def build_request(sb: dict[str, Any]) -> dict[str, Any]:
+    """Build the ACE-Step request payload from storyboard music settings."""
     m = sb["music"]
-    d = OUT / "music"
-    d.mkdir(parents=True, exist_ok=True)
-    req = {
+    return {
         "caption": m["caption"] + (", instrumental" if m["instrumental"] else ""),
         "duration": m["duration_s"],
         "bpm": m.get("bpm"),
@@ -27,15 +30,31 @@ def main():
         "n_candidates": 3,
         "hash": content_hash(m["caption"], m["instrumental"], m.get("bpm"), m.get("key"), m["duration_s"]),
     }
+
+
+def main() -> None:
+    sb = load()
+    m = sb["music"]
+    d = OUT / "music"
+    d.mkdir(parents=True, exist_ok=True)
+    req = build_request(sb)
     (d / "request.json").write_text(json.dumps(req, indent=2), encoding="utf-8")
     score = d / "score.wav"
     if score.exists():
-        log_run("music", "ACE-Step-1.5", {"request": req["hash"], "chosen": m.get("chosen_candidate")},
-                latency_s=0.0, cache="hit", output=score)
+        log_run(
+            "music",
+            "ACE-Step-1.5",
+            {"request": req["hash"], "chosen": m.get("chosen_candidate")},
+            latency_s=0.0,
+            cache="hit",
+            output=score,
+        )
         print("score.wav present")
     else:
-        print("No score.wav yet. Run the ACE-Step notebook with outputs/music/request.json, "
-              "then copy the chosen candidate to outputs/music/score.wav.")
+        print(
+            "No score.wav yet. Run the ACE-Step notebook with outputs/music/request.json, "
+            "then copy the chosen candidate to outputs/music/score.wav."
+        )
 
 
 if __name__ == "__main__":

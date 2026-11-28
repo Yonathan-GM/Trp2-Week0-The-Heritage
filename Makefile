@@ -1,6 +1,6 @@
-PY ?= python3
+PY ?= python
 
-.PHONY: setup validate smoke keyframes shots music narration assemble film clean-cache
+.PHONY: setup validate smoke keyframes shots music narration assemble film test check clean-cache
 
 setup:
 	$(PY) -m pip install -r requirements.txt
@@ -27,7 +27,14 @@ assemble: validate
 	$(PY) pipeline/assemble.py
 
 # One command to run the whole pipeline from a clean clone.
-film: validate narration keyframes shots music assemble
+film:
+	$(PY) run.py
+
+test:
+	$(PY) -m unittest discover -s tests -v
+
+check:
+	$(PY) check_submission.py
 
 clean-cache:
-	rm -rf .cache
+	$(PY) -c "import shutil; shutil.rmtree('.cache', ignore_errors=True)"

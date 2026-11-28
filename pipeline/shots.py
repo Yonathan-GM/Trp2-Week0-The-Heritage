@@ -15,9 +15,14 @@ import hashlib
 import json
 import time
 import zipfile
+from pathlib import Path
 
-from common import CACHE, OUT, content_hash, log_run
-from validate import load
+try:
+    from .common import CACHE, OUT, content_hash, log_run
+    from .validate import load
+except ImportError:
+    from common import CACHE, OUT, content_hash, log_run
+    from validate import load
 
 MODEL = "Wan2.2-TI2V-5B"
 RES = "480x832"          # width x height: portrait, because the 9:16 film is the main version
@@ -26,11 +31,12 @@ STEPS = 30
 PRIORITY = ["s09", "s08", "s01"]   # generated first; edit to taste
 
 
-def file_hash(path):
+def file_hash(path: Path) -> str:
+    """Return a 16-char SHA-256 hex digest of a file's contents."""
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
-def main():
+def main() -> None:
     sb = load()
     width, height = (int(v) for v in RES.split("x"))
     shots_dir = OUT / "shots"
@@ -39,7 +45,7 @@ def main():
     state_dir = CACHE / "shots"
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    timings = {}
+    timings: dict[str, float] = {}
     tfile = shots_dir / "timings.json"
     if tfile.exists():
         try:
@@ -47,8 +53,10 @@ def main():
         except ValueError:
             print("timings.json is not valid JSON; ignoring it")
 
-    order = sorted(sb["shots"], key=lambda s: (PRIORITY.index(s["id"]) if s["id"] in PRIORITY
-                                              else len(PRIORITY), s["id"]))
+    order = sorted(
+        sb["shots"],
+        key=lambda s: (PRIORITY.index(s["id"]) if s["id"] in PRIORITY else len(PRIORITY), s["id"]),
+    )
     jobs = []
     for shot in order:
         sid = shot["id"]
@@ -62,11 +70,17 @@ def main():
         clip = shots_dir / f"{sid}.mp4"
         new_clip = clip.exists() and (not marker.exists() or clip.stat().st_mtime > marker.stat().st_mtime)
         if new_clip:
-            marker.write_text(key)
-            log_run("shots", MODEL, {"shot": sid, "res": RES, "frames": NUM_FRAMES, "steps": STEPS,
-                                     "ingested": True}, seed=seed, latency_s=timings.get(sid), output=clip)
+            marker.write_text(key, encoding="utf-8")
+            log_run(
+                "shots",
+                MODEL,
+                {"shot": sid, "res": RES, "frames": NUM_FRAMES, "steps": STEPS, "ingested": True},
+                seed=seed,
+                latency_s=timings.get(sid),
+                output=clip,
+            )
             print(f"{sid}: ingested from notebook ({timings.get(sid, '?')} s; add GPU time to COSTS.md)")
-        elif clip.exists() and marker.exists() and marker.read_text() == key:
+        elif clip.exists() and marker.exists() and marker.read_text(encoding="utf-8") == key:
             log_run("shots", MODEL, {"shot": sid}, latency_s=0.0, cache="hit", output=clip)
             print(f"{sid}: cached")
         else:
@@ -75,10 +89,19 @@ def main():
                 clip.replace(stale_dir / f"{sid}_{int(time.time())}.mp4")
                 print(f"{sid}: keyframe or prompt changed, old clip moved to shots/stale/")
             marker.unlink(missing_ok=True)
-            jobs.append({"id": sid, "keyframe": f"keyframes/{sid}.png",
-                         "motion_prompt": shot["motion_prompt"], "seed": seed,
-                         "width": width, "height": height, "num_frames": NUM_FRAMES,
-                         "steps": STEPS, "hash": key})
+            jobs.append(
+                {
+                    "id": sid,
+                    "keyframe": f"keyframes/{sid}.png",
+                    "motion_prompt": shot["motion_prompt"],
+                    "seed": seed,
+                    "width": width,
+                    "height": height,
+                    "num_frames": NUM_FRAMES,
+                    "steps": STEPS,
+                    "hash": key,
+                }
+            )
             print(f"{sid}: needs generation")
 
     (shots_dir / "jobs.json").write_text(json.dumps(jobs, indent=2), encoding="utf-8")
@@ -90,9 +113,11 @@ def main():
                 z.write(OUT / j["keyframe"], j["keyframe"])
     elif zip_path.exists():
         zip_path.unlink()
-    print(f"\n{len(jobs)} job(s) written ({time.strftime('%H:%M:%S')})."
-          + (f" Upload {zip_path} to Kaggle." if jobs else "")
-          + " Shots without a clip use the Ken Burns fallback.")
+    print(
+        f"\n{len(jobs)} job(s) written ({time.strftime('%H:%M:%S')})."
+        + (f" Upload {zip_path} to Kaggle." if jobs else "")
+        + " Shots without a clip use the Ken Burns fallback."
+    )
 
 
 if __name__ == "__main__":

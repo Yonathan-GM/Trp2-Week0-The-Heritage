@@ -1,26 +1,30 @@
-# secrets
+# Secrets
 .env
 *.key
 
-# python
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
 
-# cache and scratch
+# Cache, scratch, and backups
 .cache/
 tmp/
 *.tmp
 *.bak*
 
+# Intermediate & large generated media (hosted externally / rebuilt by run.py)
+outputs/assemble/
+outputs/final/*.mp4
+outputs/final/*.wav
+outputs/keyframes/
+outputs/narration/
+outputs/voice_test/
+
 # OS
 .DS_Store
-
-# outputs: keep only what we want
-
-
-# secrets
-.env
-
-# secrets
-.env
+Thumbs.db

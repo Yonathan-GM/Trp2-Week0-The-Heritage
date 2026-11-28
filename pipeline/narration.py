@@ -17,8 +17,12 @@ import tempfile
 import time
 from pathlib import Path
 
-from common import OUT, cached_output, content_hash, env
-from validate import load
+try:
+    from .common import OUT, cached_output, content_hash, env
+    from .validate import load
+except ImportError:
+    from common import OUT, cached_output, content_hash, env
+    from validate import load
 
 try:
     from addisai import AddisAI
@@ -27,7 +31,7 @@ except ImportError:
 
 try:
     from addisai import InsufficientCreditsError, RateLimitError
-except ImportError:                      # older SDK without these names
+except ImportError:  # older SDK without these names
     class InsufficientCreditsError(Exception):
         pass
 
@@ -35,9 +39,9 @@ except ImportError:                      # older SDK without these names
         pass
 
 PROVIDER = "addis-ai"
-VOICE = "am-yohanes-calm" # voice id from the Addis catalogue (addis_voice_test.py lists them)
+VOICE = "am-yohanes-calm"  # voice id from the Addis catalogue (scripts/addis_voice_test.py lists them)
 LANGUAGE = "am"
-VOICE_SETTINGS = None     # e.g. {"speed": 50, "stability": 50, "similarity": 50, "style": 0}
+VOICE_SETTINGS = None      # e.g. {"speed": 50, "stability": 50, "similarity": 50, "style": 0}
 RATE = 24000
 MAX_TRIES = 3
 
@@ -45,14 +49,16 @@ _client = None
 
 
 def client():
+    """Return a lazily initialized AddisAI client."""
     global _client
     if _client is None:
         _client = AddisAI(api_key=env("ADDIS_API_KEY"))
     return _client
 
 
-def synth(text, out_path):
-    args = {"voice_id": VOICE, "text": text, "language": LANGUAGE, "output_format": "wav_44100"}
+def synth(text: str, out_path: Path) -> None:
+    """Synthesize a single Amharic narration line and convert it to 24 kHz mono WAV."""
+    args: dict = {"voice_id": VOICE, "text": text, "language": LANGUAGE, "output_format": "wav_44100"}
     if VOICE_SETTINGS:
         args["voice_settings"] = VOICE_SETTINGS
     clip = None
@@ -72,21 +78,38 @@ def synth(text, out_path):
     with tempfile.TemporaryDirectory() as d:
         raw = Path(d) / "raw.wav"
         clip.to_file(str(raw))
-        r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
-                            "-ar", str(RATE), "-ac", "1", "-sample_fmt", "s16", "-f", "wav", str(out_path)],
-                           capture_output=True, text=True)
+        r = subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
+                "-ar", str(RATE), "-ac", "1", "-sample_fmt", "s16", "-f", "wav", str(out_path),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         if r.returncode:
             raise SystemExit("ffmpeg could not convert the Addis audio:\n" + r.stderr[-800:])
-    try:    # keep the credits used, for COSTS.md
+    try:  # keep the credits used, for COSTS.md
         with open(OUT / "narration" / "addis_usage.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "voice": VOICE,
-                                "chars": len(text), "usage": getattr(clip, "usage", None)},
-                               ensure_ascii=False, default=str) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "voice": VOICE,
+                        "chars": len(text),
+                        "usage": getattr(clip, "usage", None),
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+                + "\n"
+            )
     except OSError:
         pass
 
 
-def main():
+def main() -> None:
     sb = load()
     wanted = set(sys.argv[1:])
     known = {s["id"] for s in sb["shots"]}
@@ -103,8 +126,15 @@ def main():
             continue
         key = content_hash(PROVIDER, VOICE, LANGUAGE, json.dumps(VOICE_SETTINGS, sort_keys=True), text)
         out = OUT / "narration" / f"{shot['id']}.wav"
-        _, hit = cached_output("narration", key, out, lambda p, t=text: synth(t, p),
-                               f"{PROVIDER}:{VOICE}", {"shot": shot["id"], "chars": len(text)}, seed=None)
+        _, hit = cached_output(
+            "narration",
+            key,
+            out,
+            lambda p, t=text: synth(t, p),
+            f"{PROVIDER}:{VOICE}",
+            {"shot": shot["id"], "chars": len(text)},
+            seed=None,
+        )
         print(f"{shot['id']}: {'cached' if hit else 'generated'}")
         made += 0 if hit else 1
     print(f"\n{made} clip(s) generated this run.")

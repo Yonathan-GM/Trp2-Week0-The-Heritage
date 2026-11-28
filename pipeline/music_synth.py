@@ -12,37 +12,48 @@ Usage:  python pipeline/music_synth.py          writes outputs/music/score.wav
 import sys
 import time
 import wave
+from typing import Any
 
 try:
     import numpy as np
 except ImportError:
     raise SystemExit("numpy is missing. Run: python -m pip install numpy")
 
-from common import OUT, log_run
-from validate import load
+try:
+    from .common import OUT, log_run
+    from .validate import load
+except ImportError:
+    from common import OUT, log_run
+    from validate import load
 
 SR = 44100
 BPM = 68
 BEAT = 60.0 / BPM
 BAR = 4 * BEAT
-CHORDS = [[50, 53, 57, 62],    # Dm   (MIDI note numbers: root, third, fifth, octave)
-          [46, 50, 53, 58],    # Bb
-          [53, 57, 60, 65],    # F
-          [48, 52, 55, 60]]    # C
+CHORDS = [
+    [50, 53, 57, 62],    # Dm   (MIDI note numbers: root, third, fifth, octave)
+    [46, 50, 53, 58],    # Bb
+    [53, 57, 60, 65],    # F
+    [48, 52, 55, 60],    # C
+]
 PATTERN = [0, 1, 2, 1, 3, 2, 1, 2]   # which chord tone each eighth note plays
 # (pluck, pad, shaker) level per shot, from the cue notes in storyboard.json
-LEVELS = {"s01": (0.50, 0.25, 0.0), "s02": (0.50, 0.30, 0.0), "s03": (0.12, 0.12, 0.0),
-          "s04": (0.30, 0.25, 0.0), "s05": (0.35, 0.35, 0.0), "s06": (0.40, 0.85, 0.0),
-          "s07": (0.00, 0.30, 0.0), "s08": (0.55, 0.40, 0.0), "s09": (0.85, 0.80, 0.35),
-          "s10": (0.85, 0.65, 0.55), "s11": (0.55, 0.65, 0.15)}
+LEVELS = {
+    "s01": (0.50, 0.25, 0.0), "s02": (0.50, 0.30, 0.0), "s03": (0.12, 0.12, 0.0),
+    "s04": (0.30, 0.25, 0.0), "s05": (0.35, 0.35, 0.0), "s06": (0.40, 0.85, 0.0),
+    "s07": (0.00, 0.30, 0.0), "s08": (0.55, 0.40, 0.0), "s09": (0.85, 0.80, 0.35),
+    "s10": (0.85, 0.65, 0.55), "s11": (0.55, 0.65, 0.15),
+}
 DEFAULT = (0.4, 0.3, 0.0)
 
 
-def freq(m):
+def freq(m: int | float) -> float:
+    """Convert MIDI note number to frequency in Hz."""
     return 440.0 * 2 ** ((m - 69) / 12)
 
 
-def shot_slots(sb):
+def shot_slots(sb: dict[str, Any]) -> list[float]:
+    """Compute per-shot slot durations matching assemble.py / radio_cut.py."""
     slots = []
     for s in sb["shots"]:
         v = 0.0
@@ -54,47 +65,58 @@ def shot_slots(sb):
     return slots
 
 
-def curves(sb, slots, total, t):
+def curves(sb: dict[str, Any], slots: list[float], total: float, t: np.ndarray) -> list[np.ndarray]:
     """Per-sample level curves (pluck, pad, shaker), smooth between shots."""
-    pts = [[], [], []]
+    pts: list[list[tuple[float, float]]] = [[], [], []]
     start = 0.0
     for s, slot in zip(sb["shots"], slots):
         lv = LEVELS.get(s["id"], DEFAULT)
+        ramp = min(0.8, slot / 3.0)
         for k in range(3):
-            pts[k] += [(start + 0.8, lv[k]), (start + slot - 0.8, lv[k])]
+            pts[k] += [(start + ramp, lv[k]), (start + slot - ramp, lv[k])]
         start += slot
     out = []
     for k in range(3):
+        if not pts[k]:
+            out.append(np.zeros_like(t))
+            continue
         xs = [0.0] + [p[0] for p in pts[k]] + [total]
         ys = [pts[k][0][1]] + [p[1] for p in pts[k]] + [pts[k][-1][1]]
         out.append(np.interp(t, xs, ys))
     return out
 
 
-def pluck(f, dur=2.4):
+def pluck(f: float, dur: float = 2.4) -> np.ndarray:
+    """Synthesize a warm plucked-lyre note using damped harmonic partials."""
     n = int(SR * dur)
     t = np.arange(n) / SR
     amps = [1.0, 0.55, 0.30, 0.16, 0.08, 0.04]
     decays = [1.8, 3.0, 4.5, 6.5, 9.0, 12.0]       # upper partials die faster: bright attack, mellow tail
-    y = sum(a * np.sin(2 * np.pi * f * (k + 1) * t) * np.exp(-d * t)
-            for k, (a, d) in enumerate(zip(amps, decays)))
+    y = sum(
+        a * np.sin(2 * np.pi * f * (k + 1) * t) * np.exp(-d * t)
+        for k, (a, d) in enumerate(zip(amps, decays))
+    )
     y *= np.minimum(1.0, t / 0.006)                # 6 ms attack, no click
     return y * 0.35
 
 
-def pad_bar(notes, dur):
+def pad_bar(notes: list[int], dur: float) -> np.ndarray:
+    """Synthesize a detuned warm pad chord over a Hann window."""
     n = int(SR * dur)
     t = np.arange(n) / SR
     y = np.zeros(n)
     for m in notes:
         f = freq(m)
         for det in (0.997, 1.003):
-            y += np.sin(2 * np.pi * f * det * t) + 0.35 * np.sin(2 * np.pi * 2 * f * det * t) \
-                 + 0.12 * np.sin(2 * np.pi * 3 * f * det * t)
+            y += (
+                np.sin(2 * np.pi * f * det * t)
+                + 0.35 * np.sin(2 * np.pi * 2 * f * det * t)
+                + 0.12 * np.sin(2 * np.pi * 3 * f * det * t)
+            )
     return y * np.hanning(n) * 0.05
 
 
-def main():
+def main() -> None:
     force = "--force" in sys.argv
     sb = load()
     score = OUT / "music" / "score.wav"
@@ -123,7 +145,7 @@ def main():
     left, right = np.zeros(n), np.zeros(n)
     eighth = BEAT / 2
     count = int(total / eighth)
-    cache = {}
+    cache: dict[int, np.ndarray] = {}
     for i in range(count):
         at = int(i * eighth * SR)
         lvl = pluck_lv[min(at, n - 1)]
@@ -175,8 +197,13 @@ def main():
         rms = np.sqrt(np.mean(seg ** 2)) if len(seg) else 0
         print(f"  {s['id']}: {20 * np.log10(max(rms, 1e-6)):6.1f} dB")
         start += slot
-    log_run("music", "python-synth-numpy", {"bpm": BPM, "key": "D minor", "duration_s": round(total, 1)},
-            latency_s=round(time.time() - t0, 1), output=score)
+    log_run(
+        "music",
+        "python-synth-numpy",
+        {"bpm": BPM, "key": "D minor", "duration_s": round(total, 1)},
+        latency_s=round(time.time() - t0, 1),
+        output=score,
+    )
 
 
 if __name__ == "__main__":

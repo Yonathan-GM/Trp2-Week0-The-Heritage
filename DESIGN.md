@@ -26,6 +26,10 @@
 6. A shoot appears and becomes a great tree. We, her grandchildren, play in its shade.
 7. My mother tells me whose seed it was.
 
+## AI-assisted workflow
+
+An AI assistant helped translate the oral family story into the structured `storyboard.json` contract, refine Amharic/English subtitle pacing and visual consistency prompts (such as explicit shawl borders and "bare soil, no sprout" constraints), and build the automated validation, caching, and assembly scripts. All cultural details, story beats, editorial approvals, and audience test decisions remained human-directed.
+
 ## User test 1: radio cut
 
 **Format:** Amharic narration over placeholder music on a black screen.
